@@ -1,0 +1,67 @@
+use std::str::FromStr;
+
+grammar;
+
+pub Programa: () = "program" Id ";" <Var*> Bloque => ();
+
+Var: () = "var" Id <VarIdents*> ":" Tipo ";" => ();
+VarIdents: () = "," Id => ();
+Tipo: () = {
+    "int" => (),
+    "float" => ()
+}
+
+Bloque: () = "{" <Estatuto*> "}" => ();
+Estatuto: () = {
+    Asignacion => (),
+    Condicion => (),
+    Escritura => ()
+}
+
+Asignacion: () = Id "=" Expresion ";" => ();
+Condicion: () = "if" "(" Expresion ")" Bloque <Else?> ";" => ();
+Else: () = "else" Bloque => ();
+
+Escritura: () = "print" "(" Printable <OptPrintables*> ")" ";" => ();
+Printable: () = {
+    Expresion => (),
+    Str => ()
+}
+OptPrintables: () = "," Printable => ();
+
+Exp: () = Termino <ExpExtra*> => ();
+ExpExtra: () = AddOrSub Termino => ();
+
+Termino: () = Factor <TerminoExtra*> => ();
+TerminoExtra: () = MulOrDiv Factor => (); 
+Factor: () = {
+    "(" Expresion ")" => (),
+    <AddOrSub?> Const => ()
+}
+Expresion: () = Exp <ExpComp?>;
+ExpComp: () = Comparators Exp;
+Comparators: () = {
+    ">",
+    "<",
+    "<>"
+}
+
+Const: () = {
+    Id => (),
+    Int => (),
+    Float => ()
+}
+
+AddOrSub: () = {
+    "+" => (),
+    "-" => ()
+};
+MulOrDiv: ()  = {
+    "*" => (),
+    "/" => ()
+};
+
+Id: () = r"[a-zA-Z](?:_?(?:[a-zA-Z]|(?:\d)))*" => ();
+Int: () = r"\d+" => ();
+Float: () = r"\d+(:?\.\d+)" => ();
+Str: () = r#"".*""# => ();
