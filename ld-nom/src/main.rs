@@ -1,3 +1,7 @@
+#![feature(let_chains)]
+
+mod ast;
+mod lexer;
 mod littleduck;
 
 fn main() {}

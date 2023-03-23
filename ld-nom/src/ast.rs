@@ -1,86 +1,115 @@
+#[derive(Clone, Debug, PartialEq)]
+pub enum Token {
+    Id(String),
+    Str(String),
+    Num(VarValue),
+    Program,
+    LParen,
+    RParen,
+    LBracket,
+    RBracket,
+    Add,
+    Sub,
+    Div,
+    Mul,
+    Gt,
+    Lt,
+    LtGt,
+    Eq,
+    Comma,
+    Float,
+    Int,
+    TypeSep,
+    StmtEnd,
+    Print,
+    If,
+    Else,
+    Var,
+}
+
 struct Program {
     id: String,
     vars: Vec<Var>,
-    block: Block
+    block: Block,
 }
 
 enum VarType {
     Float,
-    Int
+    Int,
 }
 
-enum VarValue {
-    Float(f64),
-    Int(i32)
+#[derive(Clone, Debug, PartialEq)]
+pub enum VarValue {
+    Float(f32),
+    Int(i32),
 }
 
 struct Var {
     id: String,
-    vtype: VarType
+    vtype: VarType,
 }
 
 enum Statement {
     Assignment(Assignment),
     Condition(Condition),
-    Print(Print)
+    Print(Print),
 }
 
 struct Block {
-    statements: Vec<Statement>
+    statements: Vec<Statement>,
 }
 
 struct Assignment {
     id: String,
-    value: VarValue
+    value: VarValue,
 }
 
 enum ExpressionOp {
     Gt,
     Lt,
-    LtGt
+    LtGt,
 }
 struct Expr {
     lhs: Exp,
     op: ExpressionOp,
-    rhs: Exp
+    rhs: Exp,
 }
 
 enum ExpOp {
     Add,
-    Sub
+    Sub,
 }
 struct Exp {
     lhs: Term,
     op: ExpOp,
-    rhs: Term
+    rhs: Term,
 }
-
 
 enum Factor {
     ParenExpr(Box<Expr>),
-    ConstantVal(VarValue)
+    ConstantVal(VarValue),
 }
 
 enum TermOp {
     Mul,
-    Div
+    Div,
 }
 struct Term {
     lhs: Factor,
     op: TermOp,
-    rhs: Factor
+    rhs: Factor,
 }
 
 struct Condition {
     expression: Expr,
     then_block: Block,
-    else_block: Option<Block>
+    else_block: Option<Block>,
 }
 
 enum PrintType {
     Expression(Expr),
-    Str(String)
+    Str(String),
 }
 struct Print {
-    output: Vec<PrintType>
+    output: Vec<PrintType>,
 }
