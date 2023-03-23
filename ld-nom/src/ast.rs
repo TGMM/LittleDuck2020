@@ -1,6 +1,6 @@
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
-    Id(String),
+    Id(Id),
     Str(String),
     Num(VarValue),
     Program,
@@ -27,13 +27,17 @@ pub enum Token {
     Var,
 }
 
-struct Program {
-    id: String,
-    vars: Vec<Var>,
-    block: Block,
+#[derive(Clone, Debug, PartialEq)]
+pub struct Id(pub String);
+
+pub struct Program {
+    pub id: Id,
+    pub vars: Vec<Var>,
+    pub block: Block,
 }
 
-enum VarType {
+#[derive(Clone, Copy)]
+pub enum VarType {
     Float,
     Int,
 }
@@ -44,72 +48,81 @@ pub enum VarValue {
     Int(i32),
 }
 
-struct Var {
-    id: String,
-    vtype: VarType,
+pub struct Var {
+    pub id: Id,
+    pub vtype: VarType,
 }
 
-enum Statement {
+pub enum Statement {
     Assignment(Assignment),
     Condition(Condition),
     Print(Print),
 }
 
-struct Block {
-    statements: Vec<Statement>,
+pub struct Block {
+    pub statements: Vec<Statement>,
 }
 
-struct Assignment {
-    id: String,
-    value: VarValue,
+pub struct Assignment {
+    pub id: Id,
+    pub value: Expr,
 }
 
-enum ExpressionOp {
+pub enum ExpressionOp {
     Gt,
     Lt,
     LtGt,
 }
-struct Expr {
-    lhs: Exp,
-    op: ExpressionOp,
-    rhs: Exp,
+pub struct ExprRhs {
+    pub op: ExpressionOp,
+    pub rhs: Exp,
+}
+pub struct Expr {
+    pub lhs: Exp,
+    pub rhs: Option<ExprRhs>,
 }
 
-enum ExpOp {
+pub enum ExpOp {
     Add,
     Sub,
 }
-struct Exp {
-    lhs: Term,
-    op: ExpOp,
-    rhs: Term,
+pub struct ExpRhs {
+    pub op: ExpOp,
+    pub rhs: Term,
+}
+pub struct Exp {
+    pub lhs: Term,
+    pub rhs: Option<ExpRhs>,
 }
 
-enum Factor {
+pub enum Factor {
     ParenExpr(Box<Expr>),
     ConstantVal(VarValue),
 }
 
-enum TermOp {
+pub enum TermOp {
     Mul,
     Div,
 }
-struct Term {
-    lhs: Factor,
-    op: TermOp,
-    rhs: Factor,
+pub struct TermRhs {
+    pub op: TermOp,
+    pub rhs: Factor,
+}
+pub struct Term {
+    pub lhs: Factor,
+    pub rhs: Option<TermRhs>,
 }
 
-struct Condition {
-    expression: Expr,
-    then_block: Block,
-    else_block: Option<Block>,
+pub struct Condition {
+    pub expression: Expr,
+    pub then_block: Block,
+    pub else_block: Option<Block>,
 }
 
-enum PrintType {
+pub enum PrintType {
     Expression(Expr),
     Str(String),
 }
-struct Print {
-    output: Vec<PrintType>,
+pub struct Print {
+    pub output: Vec<PrintType>,
 }

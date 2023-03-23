@@ -1,4 +1,4 @@
-use crate::ast::{Token, VarValue};
+use crate::ast::{Token, VarValue, Id};
 use nom::{
     branch::alt,
     bytes::complete::{escaped, tag},
@@ -69,7 +69,7 @@ fn id(input: &str) -> IResult<&str, Token> {
             alt((alpha1, tag("_"))),
             many0(alt((alphanumeric1, tag("_")))),
         )),
-        |s: &str| Token::Id(s.to_owned()),
+        |s: &str| Token::Id(Id(s.to_owned())),
     )(input)
 }
 
