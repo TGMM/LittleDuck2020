@@ -1,8 +1,10 @@
 #![feature(let_chains)]
 
 mod ast;
-mod lexer;
+pub mod lexer;
 mod littleduck;
+pub mod parser;
+mod token;
 
 fn main() {}
 
