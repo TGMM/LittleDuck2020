@@ -93,7 +93,7 @@ fn var_type_parser(input: Tokens) -> IResult<Tokens, VarType> {
 
 fn vars_parser(input: Tokens) -> IResult<Tokens, Vec<Var>> {
     let (input, _) = var_tag(input)?;
-    let (input, _) = id_parser(input)?;
+    let (input, first_var) = id_parser(input)?;
 
     // Var Idents
     let (input, var_idents) = many0(preceded(comma_tag, id_parser))(input)?;
@@ -103,7 +103,9 @@ fn vars_parser(input: Tokens) -> IResult<Tokens, Vec<Var>> {
     let (input, var_type) = var_type_parser(input)?;
     let (input, _) = stmt_end_tag(input)?;
 
-    let vars = var_idents
+    let vars = [first_var]
+        .into_iter()
+        .chain(var_idents)
         .into_iter()
         .map(|id| Var {
             id,
