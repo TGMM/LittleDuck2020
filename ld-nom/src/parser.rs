@@ -1,6 +1,6 @@
 use crate::ast::{
     Assignment, Block, Condition, Exp, ExpOp, ExpRhs, Expr, ExprRhs, ExpressionOp, Factor, Id,
-    Print, PrintType, Program, Statement, Term, TermOp, Token, Var, VarType,
+    Print, PrintType, Program, Statement, Term, TermBOp, TermOp, Token, Var, VarType, VarValue,
 };
 use crate::token::Tokens;
 use nom::branch::alt;
@@ -62,6 +62,18 @@ fn string_parser(input: Tokens) -> IResult<Tokens, String> {
     } else {
         match sym_token.tok[0].clone() {
             Token::Str(str_val) => Ok((remaining_tokens, str_val)),
+            _ => Err(Err::Error(Error::new(input, ErrorKind::Tag))),
+        }
+    }
+}
+
+fn const_value_parser(input: Tokens) -> IResult<Tokens, VarValue> {
+    let (remaining_tokens, sym_token) = take(1usize)(input)?;
+    if sym_token.tok.is_empty() {
+        Err(Err::Error(Error::new(input, ErrorKind::Tag)))
+    } else {
+        match sym_token.tok[0].clone() {
+            Token::Num(value) => Ok((remaining_tokens, value)),
             _ => Err(Err::Error(Error::new(input, ErrorKind::Tag))),
         }
     }
@@ -202,13 +214,37 @@ fn term_parser(input: Tokens) -> IResult<Tokens, Term> {
     let mul_or_div = alt((mul, div));
     let (input, term_rhs) = many0(pair(mul_or_div, factor_parser))(input)?;
 
-    let rhs = todo!();
-    let term = Term { lhs, rhs };
-    Ok((input, term))
+    if term_rhs.is_empty() {
+        return Ok((input, Term::Factor(lhs)));
+    }
+
+    if term_rhs.len() == 1 {
+        let (op, rhs) = term_rhs.into_iter().next().unwrap();
+        return Ok((
+            input,
+            Term::BOp(Box::new(TermBOp {
+                lhs: Term::Factor(lhs),
+                op,
+                rhs: Term::Factor(rhs),
+            })),
+        ));
+    }
+
+    let mut lhs = Term::Factor(lhs);
+    for (op, rhs) in term_rhs {
+        lhs = Term::BOp(Box::new(TermBOp {
+            lhs,
+            op,
+            rhs: Term::Factor(rhs),
+        }));
+    }
+
+    Ok((input, lhs))
 }
 
+// TODO: Parenthesized expression
 fn factor_parser(input: Tokens) -> IResult<Tokens, Factor> {
-    todo!()
+    map(const_value_parser, |val| Factor::ConstantVal(val))(input)
 }
 
 pub fn program_parser(input: Tokens) -> IResult<Tokens, Program> {
@@ -225,4 +261,29 @@ pub fn program_parser(input: Tokens) -> IResult<Tokens, Program> {
         block,
     };
     Ok((input, program))
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{
+        ast::{Token, VarValue},
+        parser::term_parser,
+        token::Tokens,
+    };
+
+    #[test]
+    fn term_parser_test() {
+        let tokens = Tokens::new(&[
+            Token::Num(VarValue::Int(1)),
+            Token::Mul,
+            Token::Num(VarValue::Int(2)),
+            Token::Div,
+            Token::Num(VarValue::Int(3)),
+            Token::Mul,
+            Token::Num(VarValue::Int(4)),
+        ]);
+        let res = term_parser(tokens);
+        dbg!(&res);
+        assert!(res.is_ok());
+    }
 }

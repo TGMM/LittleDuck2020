@@ -68,49 +68,60 @@ pub struct Assignment {
     pub value: Expr,
 }
 
+#[derive(Debug)]
 pub enum ExpressionOp {
     Gt,
     Lt,
     LtGt,
 }
+#[derive(Debug)]
 pub struct ExprRhs {
     pub op: ExpressionOp,
     pub rhs: Exp,
 }
+#[derive(Debug)]
 pub struct Expr {
     pub lhs: Exp,
     pub rhs: Option<ExprRhs>,
 }
 
+#[derive(Debug)]
 pub enum ExpOp {
     Add,
     Sub,
 }
+#[derive(Debug)]
 pub struct ExpRhs {
     pub op: ExpOp,
     pub rhs: Term,
 }
+#[derive(Debug)]
 pub struct Exp {
     pub lhs: Term,
     pub rhs: Option<ExpRhs>,
 }
 
+#[derive(Debug)]
 pub enum Factor {
     ParenExpr(Box<Expr>),
     ConstantVal(VarValue),
 }
 
+#[derive(Debug)]
 pub enum TermOp {
     Mul,
     Div,
 }
-pub struct TermRhs {
+#[derive(Debug)]
+pub struct TermBOp {
+    pub lhs: Term,
     pub op: TermOp,
-    pub rhs: Factor,
+    pub rhs: Term,
 }
-pub struct Term {
-    pub lhs: Factor,
-    pub rhs: Option<TermRhs>,
+#[derive(Debug)]
+pub enum Term {
+    Factor(Factor),
+    BOp(Box<TermBOp>),
 }
 
 pub struct Condition {
