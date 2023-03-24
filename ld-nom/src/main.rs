@@ -19,7 +19,7 @@ mod test {
         var my_var: int;
         var my_other_var, my_other_other_var: float;
         {
-            my_var = 10;
+            my_var = 10 + 10;
             my_var = 10 > 10;
             my_var = 10 < 10;
             my_var = 10 <> 10;

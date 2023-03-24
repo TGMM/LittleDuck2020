@@ -1,6 +1,6 @@
 #[derive(Clone, Debug, PartialEq)]
 pub enum Token {
-    Id(String),
+    Id(Id),
     Str(String),
     Num(VarValue),
     Program,
@@ -27,13 +27,18 @@ pub enum Token {
     Var,
 }
 
-struct Program {
-    id: String,
-    vars: Vec<Var>,
-    block: Block,
+#[derive(Clone, Debug, PartialEq)]
+pub struct Id(pub String);
+
+#[derive(Debug)]
+pub struct Program {
+    pub id: Id,
+    pub vars: Vec<Var>,
+    pub block: Block,
 }
 
-enum VarType {
+#[derive(Clone, Copy, Debug)]
+pub enum VarType {
     Float,
     Int,
 }
@@ -42,74 +47,103 @@ enum VarType {
 pub enum VarValue {
     Float(f32),
     Int(i32),
+    Var(Id),
 }
 
-struct Var {
-    id: String,
-    vtype: VarType,
+#[derive(Debug)]
+pub struct Var {
+    pub id: Id,
+    pub vtype: VarType,
 }
 
-enum Statement {
+#[derive(Debug)]
+pub enum Statement {
     Assignment(Assignment),
     Condition(Condition),
     Print(Print),
 }
 
-struct Block {
-    statements: Vec<Statement>,
+#[derive(Debug)]
+pub struct Block {
+    pub statements: Vec<Statement>,
 }
 
-struct Assignment {
-    id: String,
-    value: VarValue,
+#[derive(Debug)]
+pub struct Assignment {
+    pub id: Id,
+    pub value: Expr,
 }
 
-enum ExpressionOp {
+#[derive(Debug)]
+pub enum ExpressionOp {
     Gt,
     Lt,
     LtGt,
 }
-struct Expr {
-    lhs: Exp,
-    op: ExpressionOp,
-    rhs: Exp,
+#[derive(Debug)]
+pub struct ExprRhs {
+    pub op: ExpressionOp,
+    pub rhs: Exp,
+}
+#[derive(Debug)]
+pub struct Expr {
+    pub lhs: Exp,
+    pub rhs: Option<ExprRhs>,
 }
 
-enum ExpOp {
+#[derive(Debug)]
+pub enum ExpOp {
     Add,
     Sub,
 }
-struct Exp {
-    lhs: Term,
-    op: ExpOp,
-    rhs: Term,
+#[derive(Debug)]
+pub struct ExpBOp {
+    pub lhs: Exp,
+    pub op: ExpOp,
+    pub rhs: Exp,
+}
+#[derive(Debug)]
+pub enum Exp {
+    Term(Term),
+    BOp(Box<ExpBOp>),
 }
 
-enum Factor {
+#[derive(Debug)]
+pub enum Factor {
     ParenExpr(Box<Expr>),
     ConstantVal(VarValue),
 }
 
-enum TermOp {
+#[derive(Debug)]
+pub enum TermOp {
     Mul,
     Div,
 }
-struct Term {
-    lhs: Factor,
-    op: TermOp,
-    rhs: Factor,
+#[derive(Debug)]
+pub struct TermBOp {
+    pub lhs: Term,
+    pub op: TermOp,
+    pub rhs: Term,
+}
+#[derive(Debug)]
+pub enum Term {
+    Factor(Factor),
+    BOp(Box<TermBOp>),
 }
 
-struct Condition {
-    expression: Expr,
-    then_block: Block,
-    else_block: Option<Block>,
+#[derive(Debug)]
+pub struct Condition {
+    pub expression: Expr,
+    pub then_block: Block,
+    pub else_block: Option<Block>,
 }
 
-enum PrintType {
+#[derive(Debug)]
+pub enum PrintType {
     Expression(Expr),
     Str(String),
 }
-struct Print {
-    output: Vec<PrintType>,
+#[derive(Debug)]
+pub struct Print {
+    pub output: Vec<PrintType>,
 }
