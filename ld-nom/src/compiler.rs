@@ -1,7 +1,7 @@
 use crate::{
     ast::{
-        Exp, ExpBOp, ExpOp, Expr, ExprRhs, ExpressionOp, Factor, Program, Statement, Term, TermBOp,
-        TermOp, VarType,
+        Exp, ExpBOp, ExpOp, Expr, ExprRhs, ExpressionOp, Factor, PrintType, Program, Statement,
+        Term, TermBOp, TermOp, VarType,
     },
     lexer::token_parser,
     parser::program_parser,
@@ -13,9 +13,12 @@ use inkwell::{
     module::{Linkage, Module},
     passes::PassManager,
     targets::{CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetTriple},
-    types::{BasicType, BasicTypeEnum},
-    values::{BasicValue, BasicValueEnum, FunctionValue, PointerValue},
-    FloatPredicate, IntPredicate, OptimizationLevel,
+    types::{AsTypeRef, BasicMetadataTypeEnum, BasicType, BasicTypeEnum},
+    values::{
+        BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue, GlobalValue,
+        PointerValue,
+    },
+    AddressSpace, FloatPredicate, IntPredicate, OptimizationLevel,
 };
 use std::{collections::HashMap, error::Error, path::Path};
 
@@ -51,7 +54,8 @@ impl<'input, 'ctx> Compiler<'input, 'ctx> {
                         .get_global(id)
                         .expect(format!("Invalid reference to non-existant global: {id}").as_str());
 
-                    var.as_basic_value_enum()
+                    let ptr_var = var.as_pointer_value();
+                    self.builder.build_load(ptr_var, "globalderef")
                 }
             };
         }
@@ -243,6 +247,21 @@ impl<'input, 'ctx> Compiler<'input, 'ctx> {
         unreachable!()
     }
 
+    fn create_global_str(&self, new_str: &str) -> GlobalValue<'ctx> {
+        let new_str = unsafe { self.builder.build_global_string(new_str, "globstr") };
+        new_str
+    }
+
+    fn create_ptr_from_global_str(&self, str_val: GlobalValue<'ctx>) -> PointerValue<'ctx> {
+        let str_ptr = str_val.as_pointer_value();
+
+        let i8_type = self.context.i8_type();
+        let zero = i8_type.const_zero();
+        let gep_ptr = unsafe { self.builder.build_gep(str_ptr, &[zero, zero], "globstrptr") };
+
+        gep_ptr
+    }
+
     fn codegen(&self, program: Program) {
         let fn_type = self.context.i32_type().fn_type(&[], false);
         let fun = self
@@ -287,7 +306,55 @@ impl<'input, 'ctx> Compiler<'input, 'ctx> {
                     self.builder.build_store(var_ptr, new_val);
                 }
                 Statement::Condition(_) => todo!(),
-                Statement::Print(_) => todo!(),
+                Statement::Print(print) => {
+                    let printf = self
+                        .module
+                        .get_function("printf")
+                        .expect("Could not find printf. Make sure you're linking to libc.");
+
+                    let mut print_str = String::new();
+                    let mut print_args = Vec::new();
+                    for output in print.output {
+                        match output {
+                            PrintType::Expression(expr) => {
+                                let mut value = self.build_expr(expr);
+                                if let BasicValueEnum::PointerValue(ptr) = value {
+                                    value = self.builder.build_load(ptr, "ptrtoval");
+                                }
+
+                                let mut add_specifier = |v| match v {
+                                    BasicValueEnum::IntValue(_) => {
+                                        print_str += "%d";
+                                    }
+                                    BasicValueEnum::FloatValue(_) => {
+                                        print_str += "%f";
+                                    }
+                                    _ => unreachable!(),
+                                };
+
+                                add_specifier(value);
+                                print_args.push(value);
+                            }
+                            PrintType::Str(string) => print_str += string.as_str(),
+                        }
+
+                        print_str += " ";
+                    }
+                    let message = self.create_global_str(print_str.as_str());
+                    let message_ptr = self.create_ptr_from_global_str(message);
+
+                    let print_args_iter = print_args.into_iter().map(|f| match f {
+                        BasicValueEnum::IntValue(i) => BasicMetadataValueEnum::IntValue(i),
+                        BasicValueEnum::FloatValue(f) => BasicMetadataValueEnum::FloatValue(f),
+                        _ => unreachable!(),
+                    });
+                    let args: Vec<BasicMetadataValueEnum> =
+                        [BasicMetadataValueEnum::PointerValue(message_ptr)]
+                            .into_iter()
+                            .chain(print_args_iter)
+                            .collect();
+                    self.builder.build_call(printf, &args, "print");
+                }
             }
         }
 
@@ -366,6 +433,17 @@ pub fn compile_ld(input: &str) -> Result<(), Box<dyn Error>> {
         fpm: &fpm,
         // variables: HashMap::new(),
     };
+
+    // Link to printf
+    let const_char_ptr_type = compiler.context.i8_type().ptr_type(AddressSpace::default());
+    let const_char_ptr_enum = BasicMetadataTypeEnum::PointerType(const_char_ptr_type);
+    let printf_signature = compiler
+        .context
+        .i32_type()
+        .fn_type(&[const_char_ptr_enum], true);
+    compiler
+        .module
+        .add_function("printf", printf_signature, Some(Linkage::External));
 
     compiler.codegen(program);
     Compiler::compile_to_x86(

@@ -40,6 +40,9 @@ fn main() {
         y = (10 + 5) * 30;
         z = 10 + (5 * 30);
         a = y;
+
+        print("test");
+        print("test", a, 10);
     }
     "#;
 
