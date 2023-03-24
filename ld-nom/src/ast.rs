@@ -30,13 +30,14 @@ pub enum Token {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Id(pub String);
 
+#[derive(Debug)]
 pub struct Program {
     pub id: Id,
     pub vars: Vec<Var>,
     pub block: Block,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum VarType {
     Float,
     Int,
@@ -46,23 +47,28 @@ pub enum VarType {
 pub enum VarValue {
     Float(f32),
     Int(i32),
+    Var(Id),
 }
 
+#[derive(Debug)]
 pub struct Var {
     pub id: Id,
     pub vtype: VarType,
 }
 
+#[derive(Debug)]
 pub enum Statement {
     Assignment(Assignment),
     Condition(Condition),
     Print(Print),
 }
 
+#[derive(Debug)]
 pub struct Block {
     pub statements: Vec<Statement>,
 }
 
+#[derive(Debug)]
 pub struct Assignment {
     pub id: Id,
     pub value: Expr,
@@ -91,14 +97,15 @@ pub enum ExpOp {
     Sub,
 }
 #[derive(Debug)]
-pub struct ExpRhs {
+pub struct ExpBOp {
+    pub lhs: Exp,
     pub op: ExpOp,
-    pub rhs: Term,
+    pub rhs: Exp,
 }
 #[derive(Debug)]
-pub struct Exp {
-    pub lhs: Term,
-    pub rhs: Option<ExpRhs>,
+pub enum Exp {
+    Term(Term),
+    BOp(Box<ExpBOp>),
 }
 
 #[derive(Debug)]
@@ -124,16 +131,19 @@ pub enum Term {
     BOp(Box<TermBOp>),
 }
 
+#[derive(Debug)]
 pub struct Condition {
     pub expression: Expr,
     pub then_block: Block,
     pub else_block: Option<Block>,
 }
 
+#[derive(Debug)]
 pub enum PrintType {
     Expression(Expr),
     Str(String),
 }
+#[derive(Debug)]
 pub struct Print {
     pub output: Vec<PrintType>,
 }

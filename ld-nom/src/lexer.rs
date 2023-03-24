@@ -56,7 +56,7 @@ fn keywords_parser(input: &str) -> IResult<&str, Token> {
     let mul = keyword_parser("*", Token::Mul);
 
     let op = alt((
-        lparen, rparen, lbracket, rbracket, equal, stmt_end, type_sep, gt, lt, lt_gt, comma, add,
+        lparen, rparen, lbracket, rbracket, equal, stmt_end, type_sep, lt_gt, gt, lt, comma, add,
         sub, div, mul,
     ));
 
@@ -73,13 +73,10 @@ fn id(input: &str) -> IResult<&str, Token> {
     )(input)
 }
 
-/// TODO: This should parse both ints and floats as opposed
-/// to only floats
 fn number(input: &str) -> IResult<&str, Token> {
     let (remaining, num) = recognize_float(input)?;
     let num_res: Result<_, Err<nom::error::Error<&str>>> =
         pair(opt(alt((tag("+"), tag("-")))), digit1)(num);
-    dbg!(&num_res);
     if let Ok((int_remaining, (sign, num_str))) = num_res 
     && int_remaining.is_empty()
     && let Ok(mut num) = num_str.parse::<i32>() {

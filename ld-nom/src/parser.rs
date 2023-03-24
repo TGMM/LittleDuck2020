@@ -1,5 +1,5 @@
 use crate::ast::{
-    Assignment, Block, Condition, Exp, ExpOp, ExpRhs, Expr, ExprRhs, ExpressionOp, Factor, Id,
+    Assignment, Block, Condition, Exp, ExpBOp, ExpOp, Expr, ExprRhs, ExpressionOp, Factor, Id,
     Print, PrintType, Program, Statement, Term, TermBOp, TermOp, Token, Var, VarType, VarValue,
 };
 use crate::token::Tokens;
@@ -8,7 +8,7 @@ use nom::bytes::complete::take;
 use nom::combinator::{map, opt, verify};
 use nom::error::{Error, ErrorKind};
 use nom::multi::many0;
-use nom::sequence::{pair, preceded};
+use nom::sequence::{delimited, pair, preceded};
 use nom::Err;
 use nom::IResult;
 
@@ -67,7 +67,7 @@ fn string_parser(input: Tokens) -> IResult<Tokens, String> {
     }
 }
 
-fn const_value_parser(input: Tokens) -> IResult<Tokens, VarValue> {
+fn num_literal_parser(input: Tokens) -> IResult<Tokens, VarValue> {
     let (remaining_tokens, sym_token) = take(1usize)(input)?;
     if sym_token.tok.is_empty() {
         Err(Err::Error(Error::new(input, ErrorKind::Tag)))
@@ -114,9 +114,7 @@ fn vars_parser(input: Tokens) -> IResult<Tokens, Vec<Var>> {
 }
 
 fn block_parser(input: Tokens) -> IResult<Tokens, Block> {
-    let (input, _) = lbracket_tag(input)?;
-    let (input, statements) = many0(stmt_parser)(input)?;
-    let (input, _) = rbracket_tag(input)?;
+    let (input, statements) = delimited(lbracket_tag, many0(stmt_parser), rbracket_tag)(input)?;
 
     let block = Block { statements };
     Ok((input, block))
@@ -142,9 +140,7 @@ fn assignment_parser(input: Tokens) -> IResult<Tokens, Assignment> {
 
 fn condition_parser(input: Tokens) -> IResult<Tokens, Condition> {
     let (input, _) = if_tag(input)?;
-    let (input, _) = lparen_tag(input)?;
-    let (input, expr) = expression_parser(input)?;
-    let (input, _) = rparen_tag(input)?;
+    let (input, expr) = delimited(lparen_tag, expression_parser, rparen_tag)(input)?;
     let (input, then_block) = block_parser(input)?;
 
     let (input, else_block) = opt(preceded(else_tag, block_parser))(input)?;
@@ -162,27 +158,32 @@ fn condition_parser(input: Tokens) -> IResult<Tokens, Condition> {
 fn print_parser(input: Tokens) -> IResult<Tokens, Print> {
     let (input, _) = print_tag(input)?;
     let (input, _) = lparen_tag(input)?;
+
     let printable_expr = map(expression_parser, |expr| PrintType::Expression(expr));
     let printable_str = map(string_parser, |string| PrintType::Str(string));
     let mut printable = alt((printable_expr, printable_str));
-    let (input, _) = printable(input)?;
-    let (input, output) = many0(preceded(comma_tag, printable))(input)?;
+
+    let (input, first_output) = printable(input)?;
+    let (input, mut rest_output) = many0(preceded(comma_tag, printable))(input)?;
     let (input, _) = rparen_tag(input)?;
     let (input, _) = stmt_end_tag(input)?;
 
+    // Insert first item at the beggining of vec (which might be empty)
+    rest_output.insert(0, first_output);
+    let output = rest_output;
     let print = Print { output };
     Ok((input, print))
 }
 
 fn expression_parser(input: Tokens) -> IResult<Tokens, Expr> {
     let (input, lhs) = exp_parser(input)?;
-    let comparators = map(alt((lt_gt_tag, gt_tag, lt_tag)), |op| match op.tok[0] {
+    let comparator = map(alt((lt_gt_tag, gt_tag, lt_tag)), |op| match op.tok[0] {
         Token::Gt => ExpressionOp::Gt,
         Token::Lt => ExpressionOp::Lt,
         Token::LtGt => ExpressionOp::LtGt,
         _ => unreachable!(),
     });
-    let (input, expr_rhs) = opt(pair(comparators, exp_parser))(input)?;
+    let (input, expr_rhs) = opt(pair(comparator, exp_parser))(input)?;
 
     let rhs = expr_rhs.map(|erhs| ExprRhs {
         op: erhs.0,
@@ -197,14 +198,34 @@ fn exp_parser(input: Tokens) -> IResult<Tokens, Exp> {
     let add = map(add_tag, |_| ExpOp::Add);
     let sub = map(sub_tag, |_| ExpOp::Sub);
     let add_or_sub = alt((add, sub));
-    let (input, exp_rhs) = opt(pair(add_or_sub, term_parser))(input)?;
+    let (input, exp_rhs) = many0(pair(add_or_sub, term_parser))(input)?;
 
-    let rhs = exp_rhs.map(|erhs| ExpRhs {
-        op: erhs.0,
-        rhs: erhs.1,
-    });
-    let exp = Exp { lhs, rhs };
-    Ok((input, exp))
+    if exp_rhs.is_empty() {
+        return Ok((input, Exp::Term(lhs)));
+    }
+
+    if exp_rhs.len() == 1 {
+        let (op, rhs) = exp_rhs.into_iter().next().unwrap();
+        return Ok((
+            input,
+            Exp::BOp(Box::new(ExpBOp {
+                lhs: Exp::Term(lhs),
+                op,
+                rhs: Exp::Term(rhs),
+            })),
+        ));
+    }
+
+    let mut lhs = Exp::Term(lhs);
+    for (op, rhs) in exp_rhs {
+        lhs = Exp::BOp(Box::new(ExpBOp {
+            lhs,
+            op,
+            rhs: Exp::Term(rhs),
+        }));
+    }
+
+    Ok((input, lhs))
 }
 
 fn term_parser(input: Tokens) -> IResult<Tokens, Term> {
@@ -242,9 +263,19 @@ fn term_parser(input: Tokens) -> IResult<Tokens, Term> {
     Ok((input, lhs))
 }
 
-// TODO: Parenthesized expression
 fn factor_parser(input: Tokens) -> IResult<Tokens, Factor> {
-    map(const_value_parser, |val| Factor::ConstantVal(val))(input)
+    let constant = map(constant_value_parser, |val| Factor::ConstantVal(val));
+    let parenthesized_expr = map(delimited(lparen_tag, expression_parser, rparen_tag), |pe| {
+        Factor::ParenExpr(Box::new(pe))
+    });
+
+    alt((constant, parenthesized_expr))(input)
+}
+
+fn constant_value_parser(input: Tokens) -> IResult<Tokens, VarValue> {
+    let var = map(id_parser, |id| VarValue::Var(id));
+
+    alt((num_literal_parser, var))(input)
 }
 
 pub fn program_parser(input: Tokens) -> IResult<Tokens, Program> {
@@ -252,7 +283,7 @@ pub fn program_parser(input: Tokens) -> IResult<Tokens, Program> {
     let (input, program_id) = id_parser(input)?;
     let (input, _) = stmt_end_tag(input)?;
 
-    let (input, vars) = vars_parser(input)?;
+    let (input, vars) = map(many0(vars_parser), |v| v.into_iter().flatten().collect())(input)?;
     let (input, block) = block_parser(input)?;
 
     let program = Program {
@@ -267,7 +298,8 @@ pub fn program_parser(input: Tokens) -> IResult<Tokens, Program> {
 mod test {
     use crate::{
         ast::{Token, VarValue},
-        parser::term_parser,
+        lexer::token_parser,
+        parser::{exp_parser, program_parser, term_parser},
         token::Tokens,
     };
 
@@ -283,7 +315,55 @@ mod test {
             Token::Num(VarValue::Int(4)),
         ]);
         let res = term_parser(tokens);
-        dbg!(&res);
         assert!(res.is_ok());
+    }
+
+    #[test]
+    fn exp_parser_test() {
+        let tokens = Tokens::new(&[
+            Token::Num(VarValue::Int(1)),
+            Token::Add,
+            Token::Num(VarValue::Int(2)),
+            Token::Div,
+            Token::Num(VarValue::Int(3)),
+            Token::Sub,
+            Token::Num(VarValue::Int(4)),
+        ]);
+        let res = exp_parser(tokens);
+        assert!(res.is_ok());
+
+        let (remaining, term) = res.unwrap();
+        assert!(remaining.tok.is_empty());
+    }
+
+    #[test]
+    fn parser_test() {
+        let input = r#"
+        program my_program;
+        var my_var: int;
+        var my_other_var, my_other_other_var: float;
+        {
+            my_var = 10.0;
+            my_var = 10 > 10;
+            my_var = 10 < 10;
+            my_var = 10 <> 10;
+            my_var = 10 + 5 * 30;
+            my_var = (10 + 5) * 30;
+            my_var = 10 + (5 * 30);
+            
+            print("test");
+            print("test", my_var, 10);
+        }
+        "#;
+
+        let (remaining, token_vec) = token_parser(input).unwrap();
+        assert!(remaining.is_empty());
+
+        let tokens = Tokens::new(&token_vec);
+        let res = program_parser(tokens);
+        assert!(res.is_ok());
+
+        let (remaining, program) = res.unwrap();
+        assert!(remaining.tok.is_empty());
     }
 }
