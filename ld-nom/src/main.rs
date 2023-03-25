@@ -24,8 +24,12 @@ fn main() {
         z = 10 + (5 * 30);
         a = y;
 
-        print("test");
-        print("test", a, 10);
+        print("x", x, "z", z);
+        if(x > z) {
+            print("test");
+        } else {
+            print("test", a, 10);
+        };
     }
     "#;
 

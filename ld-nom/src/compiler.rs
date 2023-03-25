@@ -1,7 +1,7 @@
 use crate::{
     ast::{
-        Exp, ExpBOp, ExpOp, Expr, ExprRhs, ExpressionOp, Factor, PrintType, Program, Statement,
-        Term, TermBOp, TermOp, VarType,
+        Condition, Exp, ExpBOp, ExpOp, Expr, ExprRhs, ExpressionOp, Factor, PrintType, Program,
+        Statement, Term, TermBOp, TermOp, VarType,
     },
     lexer::token_parser,
     parser::program_parser,
@@ -251,6 +251,103 @@ impl<'input, 'ctx> Compiler<'input, 'ctx> {
         unreachable!()
     }
 
+    fn build_cond(&self, cond: Condition) {
+        let cond_expr = self.build_expr(cond.expression).into_int_value();
+        let fun = self.module.get_function("main").unwrap();
+
+        // Branch
+        let then_bb = self.context.append_basic_block(fun, "then");
+        let else_bb = self.context.append_basic_block(fun, "else");
+        let cont_bb = self.context.append_basic_block(fun, "ifcont");
+
+        self.builder
+            .build_conditional_branch(cond_expr, then_bb, else_bb);
+
+        // Then
+        self.builder.position_at_end(then_bb);
+        for stmt in cond.then_block.statements {
+            self.build_stmt(stmt);
+        }
+        self.builder.build_unconditional_branch(cont_bb);
+
+        // Else
+        if let Some(else_block) = cond.else_block {
+            self.builder.position_at_end(else_bb);
+            for stmt in else_block.statements {
+                self.build_stmt(stmt);
+            }
+        }
+        self.builder.build_unconditional_branch(cont_bb);
+
+        // Merge
+        self.builder.position_at_end(cont_bb);
+    }
+
+    fn build_stmt(&self, stmt: Statement) {
+        match stmt {
+            Statement::Assignment(assmt) => {
+                let var_id = assmt.id.0.as_str();
+                let var = self.module.get_global(var_id).expect(
+                    format!("Unexpected assignment to undeclared variable {var_id}").as_str(),
+                );
+                let var_ptr = var.as_pointer_value();
+
+                let new_val = self.build_expr(assmt.value);
+                self.builder.build_store(var_ptr, new_val);
+            }
+            Statement::Condition(cond) => self.build_cond(cond),
+            Statement::Print(print) => {
+                let printf = self
+                    .module
+                    .get_function("printf")
+                    .expect("Could not find printf. Make sure you're linking to libc.");
+
+                let mut print_str = String::new();
+                let mut print_args = Vec::new();
+                for output in print.output {
+                    match output {
+                        PrintType::Expression(expr) => {
+                            let mut value = self.build_expr(expr);
+                            if let BasicValueEnum::PointerValue(ptr) = value {
+                                value = self.builder.build_load(ptr, "ptrtoval");
+                            }
+
+                            let mut add_specifier = |v| match v {
+                                BasicValueEnum::IntValue(_) => {
+                                    print_str += "%d";
+                                }
+                                BasicValueEnum::FloatValue(_) => {
+                                    print_str += "%f";
+                                }
+                                _ => unreachable!(),
+                            };
+
+                            add_specifier(value);
+                            print_args.push(value);
+                        }
+                        PrintType::Str(string) => print_str += string.as_str(),
+                    }
+
+                    print_str += " ";
+                }
+                let message = self.create_global_str(print_str.as_str());
+                let message_ptr = self.create_ptr_from_global_str(message);
+
+                let print_args_iter = print_args.into_iter().map(|f| match f {
+                    BasicValueEnum::IntValue(i) => BasicMetadataValueEnum::IntValue(i),
+                    BasicValueEnum::FloatValue(f) => BasicMetadataValueEnum::FloatValue(f),
+                    _ => unreachable!(),
+                });
+                let args: Vec<BasicMetadataValueEnum> =
+                    [BasicMetadataValueEnum::PointerValue(message_ptr)]
+                        .into_iter()
+                        .chain(print_args_iter)
+                        .collect();
+                self.builder.build_call(printf, &args, "print");
+            }
+        }
+    }
+
     fn create_global_str(&self, new_str: &str) -> GlobalValue<'ctx> {
         let new_str = unsafe { self.builder.build_global_string(new_str, "globstr") };
         new_str
@@ -298,68 +395,7 @@ impl<'input, 'ctx> Compiler<'input, 'ctx> {
 
         // Main block
         for stmt in program.block.statements {
-            match stmt {
-                Statement::Assignment(assmt) => {
-                    let var_id = assmt.id.0.as_str();
-                    let var = self.module.get_global(var_id).expect(
-                        format!("Unexpected assignment to undeclared variable {var_id}").as_str(),
-                    );
-                    let var_ptr = var.as_pointer_value();
-
-                    let new_val = self.build_expr(assmt.value);
-                    self.builder.build_store(var_ptr, new_val);
-                }
-                Statement::Condition(_) => todo!(),
-                Statement::Print(print) => {
-                    let printf = self
-                        .module
-                        .get_function("printf")
-                        .expect("Could not find printf. Make sure you're linking to libc.");
-
-                    let mut print_str = String::new();
-                    let mut print_args = Vec::new();
-                    for output in print.output {
-                        match output {
-                            PrintType::Expression(expr) => {
-                                let mut value = self.build_expr(expr);
-                                if let BasicValueEnum::PointerValue(ptr) = value {
-                                    value = self.builder.build_load(ptr, "ptrtoval");
-                                }
-
-                                let mut add_specifier = |v| match v {
-                                    BasicValueEnum::IntValue(_) => {
-                                        print_str += "%d";
-                                    }
-                                    BasicValueEnum::FloatValue(_) => {
-                                        print_str += "%f";
-                                    }
-                                    _ => unreachable!(),
-                                };
-
-                                add_specifier(value);
-                                print_args.push(value);
-                            }
-                            PrintType::Str(string) => print_str += string.as_str(),
-                        }
-
-                        print_str += " ";
-                    }
-                    let message = self.create_global_str(print_str.as_str());
-                    let message_ptr = self.create_ptr_from_global_str(message);
-
-                    let print_args_iter = print_args.into_iter().map(|f| match f {
-                        BasicValueEnum::IntValue(i) => BasicMetadataValueEnum::IntValue(i),
-                        BasicValueEnum::FloatValue(f) => BasicMetadataValueEnum::FloatValue(f),
-                        _ => unreachable!(),
-                    });
-                    let args: Vec<BasicMetadataValueEnum> =
-                        [BasicMetadataValueEnum::PointerValue(message_ptr)]
-                            .into_iter()
-                            .chain(print_args_iter)
-                            .collect();
-                    self.builder.build_call(printf, &args, "print");
-                }
-            }
+            self.build_stmt(stmt);
         }
 
         let int_zero = self.context.i32_type().const_zero();
