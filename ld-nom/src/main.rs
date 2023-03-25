@@ -12,30 +12,13 @@ mod token;
 fn main() {
     let input = r#"
     program my_program;
-    var my_var: int;
-    var my_other_var, my_other_other_var: float;
-    {
-        my_var = 10 + 10;
-        my_var = 10 > 10;
-        my_var = 10 < 10;
-        my_var = 10 <> 10;
-        my_var = 10 + 5 * 30;
-        my_var = (10 + 5) * 30;
-        my_var = 10 + (5 * 30);
-        
-        print("test");
-        print("test", my_var, 10);
-    }
-    "#;
-
-    let short_input = r#"
-    program my_program;
     var a, x, y, z: int;
     var f: float;
     {
         a = 10 + 10;
         a = 10 > 10;
         a = 10 < 10;
+        a = 10 <> 10;
         x = 10 + 5 * 30;
         y = (10 + 5) * 30;
         z = 10 + (5 * 30);
@@ -46,7 +29,7 @@ fn main() {
     }
     "#;
 
-    compile_ld(short_input).unwrap();
+    compile_ld(input).unwrap();
 }
 
 #[cfg(test)]

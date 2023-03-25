@@ -223,7 +223,10 @@ impl<'input, 'ctx> Compiler<'input, 'ctx> {
                     .builder
                     .build_float_compare(FloatPredicate::OLT, lhs, rhs, "fltcmp")
                     .as_basic_value_enum(),
-                ExpressionOp::LtGt => todo!(), // I don't know what this operator does
+                ExpressionOp::LtGt => self
+                    .builder
+                    .build_float_compare(FloatPredicate::ONE, lhs, rhs, "fnecmp")
+                    .as_basic_value_enum(),
             };
         }
 
@@ -240,7 +243,10 @@ impl<'input, 'ctx> Compiler<'input, 'ctx> {
                     .builder
                     .build_int_compare(IntPredicate::SLT, lhs, rhs, "iltcmp")
                     .as_basic_value_enum(),
-                ExpressionOp::LtGt => todo!(), // I don't know what this operator does
+                ExpressionOp::LtGt => self
+                    .builder
+                    .build_int_compare(IntPredicate::NE, lhs, rhs, "inecmp")
+                    .as_basic_value_enum(),
             };
         }
 
@@ -416,14 +422,14 @@ pub fn compile_ld(input: &str) -> Result<(), Box<dyn Error>> {
     let builder = context.create_builder();
 
     let fpm = PassManager::create(&module);
-    // fpm.add_instruction_combining_pass();
-    // fpm.add_reassociate_pass();
-    // fpm.add_gvn_pass();
-    // fpm.add_cfg_simplification_pass();
-    // fpm.add_basic_alias_analysis_pass();
-    // fpm.add_promote_memory_to_register_pass();
-    // fpm.add_instruction_combining_pass();
-    // fpm.add_reassociate_pass();
+    fpm.add_instruction_combining_pass();
+    fpm.add_reassociate_pass();
+    fpm.add_gvn_pass();
+    fpm.add_cfg_simplification_pass();
+    fpm.add_basic_alias_analysis_pass();
+    fpm.add_promote_memory_to_register_pass();
+    fpm.add_instruction_combining_pass();
+    fpm.add_reassociate_pass();
     fpm.initialize();
 
     let compiler = Compiler {
