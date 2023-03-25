@@ -13,22 +13,20 @@ use inkwell::{
     module::{Linkage, Module},
     passes::PassManager,
     targets::{CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetTriple},
-    types::{AsTypeRef, BasicMetadataTypeEnum, BasicType, BasicTypeEnum},
+    types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum},
     values::{
         BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue, GlobalValue,
         PointerValue,
     },
     AddressSpace, FloatPredicate, IntPredicate, OptimizationLevel,
 };
-use std::{collections::HashMap, error::Error, path::Path};
+use std::{error::Error, path::Path};
 
 pub struct Compiler<'input, 'ctx> {
     pub context: &'ctx Context,
     pub builder: &'input Builder<'ctx>,
     pub fpm: &'input PassManager<FunctionValue<'ctx>>,
     pub module: &'input Module<'ctx>,
-    // pub function: &'a Function,
-    // pub variables: HashMap<String, PointerValue<'ctx>>,
 }
 
 impl<'input, 'ctx> Compiler<'input, 'ctx> {
@@ -437,7 +435,6 @@ pub fn compile_ld(input: &str) -> Result<(), Box<dyn Error>> {
         module: &module,
         context: &context,
         fpm: &fpm,
-        // variables: HashMap::new(),
     };
 
     // Link to printf
