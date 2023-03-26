@@ -1,8 +1,8 @@
-use crate::ast::{Token, VarValue, Id};
+use crate::{ast::{Token, VarValue, Id}, parse_string::parse_string};
 use nom::{
     branch::alt,
-    bytes::complete::{escaped, tag},
-    character::complete::{alpha1, alphanumeric0, alphanumeric1, digit1, multispace0, one_of},
+    bytes::complete::{tag},
+    character::complete::{alpha1, alphanumeric1, digit1, multispace0},
     combinator::{map, opt, recognize},
     error::{Error, ParseError},
     multi::many0,
@@ -63,7 +63,7 @@ fn keywords_parser(input: &str) -> IResult<&str, Token> {
     alt((kw, op))(input)
 }
 
-fn id(input: &str) -> IResult<&str, Token> {
+fn id_parser(input: &str) -> IResult<&str, Token> {
     map(
         recognize(pair(
             alt((alpha1, tag("_"))),
@@ -73,7 +73,7 @@ fn id(input: &str) -> IResult<&str, Token> {
     )(input)
 }
 
-fn number(input: &str) -> IResult<&str, Token> {
+fn number_parser(input: &str) -> IResult<&str, Token> {
     let (remaining, num) = recognize_float(input)?;
     let num_res: Result<_, Err<nom::error::Error<&str>>> =
         pair(opt(alt((tag("+"), tag("-")))), digit1)(num);
@@ -90,28 +90,147 @@ fn number(input: &str) -> IResult<&str, Token> {
     map(float, |f| Token::Num(VarValue::Float(f)))(input)
 }
 
-fn string(input: &str) -> IResult<&str, Token> {
-    let parse_escaped_str = delimited(
-        tag("\""),
-        escaped(alphanumeric0, '\\', one_of("\"\\")),
-        tag("\""),
-    );
-    let mut str_to_tok = map(parse_escaped_str, |f: &str| Token::Str(f.to_owned()));
-    let (remaining, tok) = str_to_tok(input)?;
-
-    Ok((remaining, tok))
+fn string_parser(input: &str) -> IResult<&str, Token> {
+    map(parse_string, |f: String| Token::Str(f.to_owned()))(input)
 }
 
 pub fn token_parser(input: &str) -> IResult<&str, Vec<Token>> {
-    many0(ws(alt((keywords_parser, number, string, id))))(input)
+    many0(ws(alt((keywords_parser, number_parser, string_parser, id_parser))))(input)
 }
 
 #[cfg(test)]
 mod test {
-    use super::token_parser;
+    use nom::multi::{many1, many0};
+
+    use crate::{ast::{Token, VarValue}, lexer::{ws, number_parser, id_parser}};
+    use super::{token_parser, string_parser, keywords_parser};
 
     #[test]
-    fn lexer_works_correctly() {
+    fn keywords_parser_test() {
+        let input = "program var int float print if else ( ) { } = ; : > < <> , + - / *";
+        
+        let res = many1(ws(keywords_parser))(input);
+        assert!(res.is_ok());
+
+        let (remaining, tokens) = res.unwrap();
+        dbg!(remaining, &tokens);
+        assert!(remaining.is_empty());
+        
+        assert_eq!(tokens, vec![
+            Token::Program,
+            Token::Var,
+            Token::Int,
+            Token::Float,
+            Token::Print,
+            Token::If,
+            Token::Else,
+            Token::LParen,
+            Token::RParen,
+            Token::LBracket,
+            Token::RBracket,
+            Token::Eq,
+            Token::StmtEnd,
+            Token::TypeSep,
+            Token::Gt,
+            Token::Lt,
+            Token::LtGt,
+            Token::Comma,
+            Token::Add,
+            Token::Sub,
+            Token::Div,
+            Token::Mul
+        ]);
+    }
+
+    #[test]
+    fn number_parser_test() {
+        let input = "1 2.0 3.1 4.234 5 123456789";
+        let res = many1(ws(number_parser))(input);
+        assert!(res.is_ok());
+
+        let (remaining, tokens) = res.unwrap();
+        dbg!(remaining, &tokens);
+        assert!(remaining.is_empty());
+
+        assert_eq!(tokens, vec![
+            Token::Num(VarValue::Int(1)),
+            Token::Num(VarValue::Float(2.0)),
+            Token::Num(VarValue::Float(3.1)),
+            Token::Num(VarValue::Float(4.234)),
+            Token::Num(VarValue::Int(5)),
+            Token::Num(VarValue::Int(123456789)),
+        ]);
+    }
+
+    #[test]
+    fn string_parser_test() {
+        let input = r#""This is a test string\n" "This is another test string\t""#;
+        let res = many0(ws(string_parser))(input);
+        dbg!(&res);
+        assert!(res.is_ok());
+
+        let (remaining, str_tokens) = res.unwrap();
+        dbg!(remaining, &str_tokens);
+        assert!(remaining.is_empty());
+
+        assert_eq!(str_tokens, vec![
+            Token::Str("This is a test string\n".to_string()),
+            Token::Str("This is another test string\t".to_string())
+        ]);
+    }
+
+    #[test]
+    fn id_parser_test() {
+        let input = "x y z my_var my_super_long_var_name";
+        let res = many1(ws(id_parser))(input);
+        assert!(res.is_ok());
+
+        let (remaining, tokens) = res.unwrap();
+        dbg!(remaining, &tokens);
+        assert!(remaining.is_empty());
+
+        assert_eq!(tokens, vec![
+            Token::Id("x".into()),
+            Token::Id("y".into()),
+            Token::Id("z".into()),
+            Token::Id("my_var".into()),
+            Token::Id("my_super_long_var_name".into()),
+        ]);
+    }
+
+    #[test]
+    fn can_parse_strings() {
+        let input = r#"
+        program my_program;
+        {   
+            print("\ntest");
+        }
+        "#;
+
+        let res = token_parser(input);
+        dbg!(&res);
+        assert!(res.is_ok());
+
+        let (remaining, token_vec) = res.unwrap();
+        dbg!(remaining);
+        assert!(remaining.is_empty());
+
+        assert_eq!(token_vec, vec![
+            Token::Program,
+            Token::Id("my_program".into()),
+            Token::StmtEnd,
+            Token::LBracket,
+            Token::Print,
+            Token::LParen,
+            Token::Str("\ntest".to_string()),
+            Token::RParen,
+            Token::StmtEnd,
+            Token::RBracket,
+        ]);
+    }
+
+    #[test]
+    fn full_lexer_test() {
         let input = r#"
         program my_program;
         var my_var: int;

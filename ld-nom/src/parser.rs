@@ -339,29 +339,121 @@ mod test {
     }
 
     #[test]
-    fn parser_test() {
-        let input = r#"
-        program my_program;
-        var my_var: int;
-        var my_other_var, my_other_other_var: float;
-        {
-            my_var = 10.0;
-            my_var = 10 > 10;
-            my_var = 10 < 10;
-            my_var = 10 <> 10;
-            my_var = 10 + 5 * 30;
-            my_var = (10 + 5) * 30;
-            my_var = 10 + (5 * 30);
-            
-            print("test");
-            print("test", my_var, 10);
-        }
-        "#;
+    fn full_parser_test() {
+        // program my_program;
+        // var my_var: int;
+        // var my_other_var, my_other_other_var: float;
+        // {
+        //     my_var = 10.0;
+        //     my_var = 10 > 10;
+        //     my_var = 10 < 10;
+        //     my_var = 10 <> 10;
+        //     my_var = 10 + 5 * 30;
+        //     my_var = (10 + 5) * 30;
+        //     my_var = 10 + (5 * 30);
+        //
+        //     print("test");
+        //     print("test", my_var, 10);
+        // }
+        let token_arr = [
+            // program my_program;
+            Token::Program,
+            Token::Id("my_program".into()),
+            Token::StmtEnd,
+            // var my_var: int;
+            Token::Var,
+            Token::Id("my_var".into()),
+            Token::TypeSep,
+            Token::Int,
+            Token::StmtEnd,
+            // var my_other_var, my_other_other_var: float;
+            Token::Var,
+            Token::Id("my_other_var".into()),
+            Token::Comma,
+            Token::Id("my_other_other_var".into()),
+            Token::TypeSep,
+            Token::Float,
+            Token::StmtEnd,
+            // {
+            Token::LBracket,
+            // my_var = 10.0;
+            Token::Id("my_var".into()),
+            Token::Eq,
+            Token::Num(VarValue::Float(10.0)),
+            Token::StmtEnd,
+            // my_var = 10 > 10;
+            Token::Id("my_var".into()),
+            Token::Eq,
+            Token::Num(VarValue::Int(10)),
+            Token::Gt,
+            Token::Num(VarValue::Int(10)),
+            Token::StmtEnd,
+            // my_var = 10 < 10;
+            Token::Id("my_var".into()),
+            Token::Eq,
+            Token::Num(VarValue::Int(10)),
+            Token::Lt,
+            Token::Num(VarValue::Int(10)),
+            Token::StmtEnd,
+            // my_var = 10 <> 10;
+            Token::Id("my_var".into()),
+            Token::Eq,
+            Token::Num(VarValue::Int(10)),
+            Token::LtGt,
+            Token::Num(VarValue::Int(10)),
+            Token::StmtEnd,
+            // my_var = 10 + 5 * 30;
+            Token::Id("my_var".into()),
+            Token::Eq,
+            Token::Num(VarValue::Int(10)),
+            Token::Add,
+            Token::Num(VarValue::Int(5)),
+            Token::Mul,
+            Token::Num(VarValue::Int(30)),
+            Token::StmtEnd,
+            // my_var = (10 + 5) * 30;
+            Token::Id("my_var".into()),
+            Token::Eq,
+            Token::LParen,
+            Token::Num(VarValue::Int(10)),
+            Token::Add,
+            Token::Num(VarValue::Int(5)),
+            Token::RParen,
+            Token::Mul,
+            Token::Num(VarValue::Int(30)),
+            Token::StmtEnd,
+            // my_var = 10 + (5 * 30);
+            Token::Id("my_var".into()),
+            Token::Eq,
+            Token::Num(VarValue::Int(10)),
+            Token::Add,
+            Token::LParen,
+            Token::Num(VarValue::Int(5)),
+            Token::RParen,
+            Token::Mul,
+            Token::Num(VarValue::Int(30)),
+            Token::StmtEnd,
+            // print("test");
+            Token::Print,
+            Token::LParen,
+            Token::Str("test".to_string()),
+            Token::RParen,
+            Token::StmtEnd,
+            // print("test", my_var, 10);
+            Token::Print,
+            Token::LParen,
+            Token::Str("test".to_string()),
+            Token::Comma,
+            Token::Id("my_var".into()),
+            Token::Comma,
+            Token::Num(VarValue::Int(10)),
+            Token::RParen,
+            Token::StmtEnd,
+            // }
+            Token::RBracket,
+        ];
+        let tokens = Tokens::new(&token_arr);
 
-        let (remaining, token_vec) = token_parser(input).unwrap();
-        assert!(remaining.is_empty());
-
-        let tokens = Tokens::new(&token_vec);
         let res = program_parser(tokens);
         assert!(res.is_ok());
 

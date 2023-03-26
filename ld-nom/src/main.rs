@@ -6,6 +6,7 @@ mod ast;
 mod compiler;
 pub mod lexer;
 mod littleduck;
+mod parse_string;
 pub mod parser;
 mod token;
 

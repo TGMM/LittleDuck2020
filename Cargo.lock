@@ -305,9 +305,8 @@ checksum = "e4a24736216ec316047a1fc4252e27dabb04218aa4a3f37c6e7ddbf1f9782b54"
 
 [[package]]
 name = "nom"
-version = "7.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d273983c5a657a70a3e8f2a01329822f3b8c8172b73826411a55751e404a0a4a"
+version = "7.1.2"
+source = "git+https://github.com/rust-bakery/nom#e7b65783219c73117b4bae04c1d949747e082d2b"
 dependencies = [
  "memchr",
  "minimal-lexical",
