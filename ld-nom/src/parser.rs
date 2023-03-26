@@ -300,7 +300,6 @@ pub fn program_parser(input: Tokens) -> IResult<Tokens, Program> {
 mod test {
     use crate::{
         ast::{Token, VarValue},
-        lexer::token_parser,
         parser::{exp_parser, program_parser, term_parser},
         token::Tokens,
     };
@@ -334,7 +333,7 @@ mod test {
         let res = exp_parser(tokens);
         assert!(res.is_ok());
 
-        let (remaining, term) = res.unwrap();
+        let (remaining, _term) = res.unwrap();
         assert!(remaining.tok.is_empty());
     }
 
@@ -457,7 +456,7 @@ mod test {
         let res = program_parser(tokens);
         assert!(res.is_ok());
 
-        let (remaining, program) = res.unwrap();
+        let (remaining, _program) = res.unwrap();
         assert!(remaining.tok.is_empty());
     }
 }

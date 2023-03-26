@@ -25,11 +25,11 @@ fn main() {
         z = 10 + (5 * 30);
         a = y;
 
-        print("x", x, "z", z);
+        print("x: ", x, "\n", "z: ", z, "\n");
         if(x > z) {
             print("test");
         } else {
-            print("test", a, 10);
+            print("test ", a, " ", 10);
         };
     }
     "#;

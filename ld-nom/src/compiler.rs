@@ -327,8 +327,6 @@ impl<'input, 'ctx> Compiler<'input, 'ctx> {
                         }
                         PrintType::Str(string) => print_str += string.as_str(),
                     }
-
-                    print_str += " ";
                 }
                 let message = self.create_global_str(print_str.as_str());
                 let message_ptr = self.create_ptr_from_global_str(message);
