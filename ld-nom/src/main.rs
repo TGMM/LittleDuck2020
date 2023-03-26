@@ -1,67 +1,44 @@
 #![feature(let_chains)]
 
-use compiler::compile_ld;
-
 mod ast;
 mod compiler;
 pub mod lexer;
-mod littleduck;
 mod parse_string;
 pub mod parser;
 mod token;
 
-fn main() {
-    let input = r#"
-    program my_program;
-    var a, x, y, z: int;
-    var f: float;
-    {
-        a = 10 + 10;
-        a = 10 > 10;
-        a = 10 < 10;
-        a = 10 <> 10;
-        x = 10 + 5 * 30;
-        y = (10 + 5) * 30;
-        z = 10 + (5 * 30);
-        a = y;
+use clap::Parser;
+use compiler::compile_ld;
+use std::{fs, path::Path, process::exit};
 
-        print("x: ", x, "\n", "z: ", z, "\n");
-        if(x > z) {
-            print("test");
-        } else {
-            print("test ", a, " ", 10);
-        };
-    }
-    "#;
-
-    compile_ld(input).unwrap();
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// Path of the program to compile
+    paths: Vec<String>,
 }
 
-#[cfg(test)]
-mod test {
-    use crate::littleduck::programa_parser;
+fn main() {
+    let args = Args::parse();
 
-    #[test]
-    fn programa_test() {
-        let input = r#"
-        program my_program;
-        var my_var: int;
-        var my_other_var, my_other_other_var: float;
-        {
-            my_var = 10 + 10;
-            my_var = 10 > 10;
-            my_var = 10 < 10;
-            my_var = 10 <> 10;
-            my_var = 10 + 5 * 30;
-            my_var = (10 + 5) * 30;
-            my_var = 10 + (5 * 30);
-            
-            print("test");
-            print("test", my_var, 10);
+    if args.paths.is_empty() {
+        eprintln!("Littleduck: error: no input files");
+        exit(-1);
+    }
+
+    for path in args.paths {
+        let path = Path::new(&path);
+
+        if !path.is_file() {
+            eprintln!("Please provide a valid file path (Is the path a directory?)");
+            exit(-1);
         }
-        "#;
 
-        let no_space_input: String = input.split_whitespace().collect();
-        programa_parser(&no_space_input).unwrap();
+        let dir = path.parent().unwrap().to_str().unwrap();
+        let file_name = path.file_name().unwrap().to_str().unwrap();
+        let output_name = path.file_stem().unwrap().to_str().unwrap();
+        println!("Compiling {}...", file_name);
+        let file_content = fs::read_to_string(path).expect("Unable to read file");
+        compile_ld(&file_content, dir, output_name).unwrap();
     }
 }

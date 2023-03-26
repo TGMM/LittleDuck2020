@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 nom = { git = "https://github.com/rust-bakery/nom" }
 inkwell = { git = "https://github.com/TheDan64/inkwell", branch = "master", features = ["llvm14-0", "target-x86"], default-features = false }
+clap = { version = "4.1.13", features = ["derive"] }

@@ -443,7 +443,7 @@ impl<'input, 'ctx> Compiler<'input, 'ctx> {
     }
 }
 
-pub fn compile_ld(input: &str) -> Result<(), Box<dyn Error>> {
+pub fn compile_ld(input: &str, output_dir: &str, output_name: &str) -> Result<(), Box<dyn Error>> {
     let (_, token_vec) = token_parser(input).unwrap();
     let tokens = Tokens::new(&token_vec);
     let (_, program) = program_parser(tokens).unwrap();
@@ -483,11 +483,7 @@ pub fn compile_ld(input: &str) -> Result<(), Box<dyn Error>> {
         .add_function("printf", printf_signature, Some(Linkage::External));
 
     compiler.codegen(program);
-    Compiler::compile_to_x86(
-        &compiler,
-        "C:/Users/TGMM/Documents/Tareas/Compiladores/little-duck/ld-nom/test",
-        "out",
-    );
+    Compiler::compile_to_x86(&compiler, output_dir, output_name);
 
     Ok(())
 }
