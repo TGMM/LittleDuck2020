@@ -29,6 +29,16 @@ pub enum Token {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Id(pub String);
+impl From<&str> for Id {
+    fn from(value: &str) -> Self {
+        Id(value.to_string())
+    }
+}
+impl From<String> for Id {
+    fn from(value: String) -> Self {
+        Id(value)
+    }
+}
 
 #[derive(Debug)]
 pub struct Program {
