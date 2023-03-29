@@ -14,3 +14,13 @@ impl From<TokenSpan<'_>> for Token {
         value.token
     }
 }
+
+#[cfg(test)]
+impl From<Token> for TokenSpan<'_> {
+    fn from(value: Token) -> Self {
+        TokenSpan {
+            position: StrSpan::new(""),
+            token: value,
+        }
+    }
+}

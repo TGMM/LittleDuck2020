@@ -1,7 +1,7 @@
 use crate::{
     ast::{
         Condition, Exp, ExpBOp, ExpOp, Expr, ExprRhs, ExpressionOp, Factor, PrintType, Program,
-        Statement, Term, TermBOp, TermOp, Token, VarType,
+        Statement, Term, TermBOp, TermOp, VarType,
     },
     lexer::token_parser,
     parser::program_parser,
@@ -446,8 +446,7 @@ impl<'input, 'ctx> Compiler<'input, 'ctx> {
 
 pub fn compile_ld(input: &str, output_dir: &str, output_name: &str) -> Result<(), Box<dyn Error>> {
     let (_, token_span_vec) = token_parser(input).unwrap();
-    let token_vec: Vec<Token> = token_span_vec.into_iter().map(|ts| ts.into()).collect();
-    let tokens = Tokens::new(&token_vec);
+    let tokens = Tokens::new(&token_span_vec);
     let (_, program) = program_parser(tokens).unwrap();
     let id = program.id.0.as_str();
 

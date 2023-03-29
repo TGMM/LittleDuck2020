@@ -15,7 +15,7 @@ use nom::IResult;
 macro_rules! tag_token (
     ($func_name:ident, $tag: expr) => (
         fn $func_name(tokens: Tokens) -> IResult<Tokens, Tokens> {
-            verify(take(1usize), |t: &Tokens| t.tok[0] == $tag)(tokens)
+            verify(take(1usize), |t: &Tokens| t.tok_span[0].token == $tag)(tokens)
         }
     )
   );
@@ -45,10 +45,10 @@ tag_token!(div_tag, Token::Div);
 
 fn id_parser(input: Tokens) -> IResult<Tokens, Id> {
     let (remaining_tokens, sym_token) = take(1usize)(input)?;
-    if sym_token.tok.is_empty() {
+    if sym_token.tok_span.is_empty() {
         Err(Err::Error(Error::new(input, ErrorKind::Tag)))
     } else {
-        match sym_token.tok[0].clone() {
+        match sym_token.tok_span[0].token.clone() {
             Token::Id(id) => Ok((remaining_tokens, id)),
             _ => Err(Err::Error(Error::new(input, ErrorKind::Tag))),
         }
@@ -57,10 +57,10 @@ fn id_parser(input: Tokens) -> IResult<Tokens, Id> {
 
 fn string_parser(input: Tokens) -> IResult<Tokens, String> {
     let (remaining_tokens, sym_token) = take(1usize)(input)?;
-    if sym_token.tok.is_empty() {
+    if sym_token.tok_span.is_empty() {
         Err(Err::Error(Error::new(input, ErrorKind::Tag)))
     } else {
-        match sym_token.tok[0].clone() {
+        match sym_token.tok_span[0].token.clone() {
             Token::Str(str_val) => Ok((remaining_tokens, str_val)),
             _ => Err(Err::Error(Error::new(input, ErrorKind::Tag))),
         }
@@ -69,10 +69,10 @@ fn string_parser(input: Tokens) -> IResult<Tokens, String> {
 
 fn num_literal_parser(input: Tokens) -> IResult<Tokens, VarValue> {
     let (remaining_tokens, sym_token) = take(1usize)(input)?;
-    if sym_token.tok.is_empty() {
+    if sym_token.tok_span.is_empty() {
         Err(Err::Error(Error::new(input, ErrorKind::Tag)))
     } else {
-        match sym_token.tok[0].clone() {
+        match sym_token.tok_span[0].token.clone() {
             Token::Num(value) => Ok((remaining_tokens, value)),
             _ => Err(Err::Error(Error::new(input, ErrorKind::Tag))),
         }
@@ -81,8 +81,8 @@ fn num_literal_parser(input: Tokens) -> IResult<Tokens, VarValue> {
 
 fn var_type_parser(input: Tokens) -> IResult<Tokens, VarType> {
     map(alt((int_tag, float_tag)), |tokens| {
-        let tok = &tokens.tok[0];
-        let var_type: VarType = match tok {
+        let tok_span = &tokens.tok_span[0];
+        let var_type: VarType = match tok_span.token {
             Token::Float => VarType::Float,
             Token::Int => VarType::Int,
             _ => unreachable!(),
@@ -179,11 +179,13 @@ fn print_parser(input: Tokens) -> IResult<Tokens, Print> {
 
 fn expression_parser(input: Tokens) -> IResult<Tokens, Expr> {
     let (input, lhs) = exp_parser(input)?;
-    let comparator = map(alt((lt_gt_tag, gt_tag, lt_tag)), |op| match op.tok[0] {
-        Token::Gt => ExpressionOp::Gt,
-        Token::Lt => ExpressionOp::Lt,
-        Token::LtGt => ExpressionOp::LtGt,
-        _ => unreachable!(),
+    let comparator = map(alt((lt_gt_tag, gt_tag, lt_tag)), |op| {
+        match op.tok_span[0].token {
+            Token::Gt => ExpressionOp::Gt,
+            Token::Lt => ExpressionOp::Lt,
+            Token::LtGt => ExpressionOp::LtGt,
+            _ => unreachable!(),
+        }
     });
     let (input, expr_rhs) = opt(pair(comparator, exp_parser))(input)?;
 
@@ -306,7 +308,7 @@ mod test {
 
     #[test]
     fn term_parser_test() {
-        let tokens = Tokens::new(&[
+        let token_span_vec = &[
             Token::Num(VarValue::Int(1)),
             Token::Mul,
             Token::Num(VarValue::Int(2)),
@@ -314,14 +316,16 @@ mod test {
             Token::Num(VarValue::Int(3)),
             Token::Mul,
             Token::Num(VarValue::Int(4)),
-        ]);
+        ]
+        .map(|t| t.into());
+        let tokens = Tokens::new(token_span_vec);
         let res = term_parser(tokens);
         assert!(res.is_ok());
     }
 
     #[test]
     fn exp_parser_test() {
-        let tokens = Tokens::new(&[
+        let token_span_vec = &[
             Token::Num(VarValue::Int(1)),
             Token::Add,
             Token::Num(VarValue::Int(2)),
@@ -329,12 +333,14 @@ mod test {
             Token::Num(VarValue::Int(3)),
             Token::Sub,
             Token::Num(VarValue::Int(4)),
-        ]);
+        ]
+        .map(|t| t.into());
+        let tokens = Tokens::new(token_span_vec);
         let res = exp_parser(tokens);
         assert!(res.is_ok());
 
         let (remaining, _term) = res.unwrap();
-        assert!(remaining.tok.is_empty());
+        assert!(remaining.tok_span.is_empty());
     }
 
     #[test]
@@ -451,12 +457,13 @@ mod test {
             // }
             Token::RBracket,
         ];
-        let tokens = Tokens::new(&token_arr);
+        let token_span_vec = &token_arr.map(|t| t.into());
+        let tokens = Tokens::new(token_span_vec);
 
         let res = program_parser(tokens);
         assert!(res.is_ok());
 
         let (remaining, _program) = res.unwrap();
-        assert!(remaining.tok.is_empty());
+        assert!(remaining.tok_span.is_empty());
     }
 }
