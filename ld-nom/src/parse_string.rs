@@ -7,7 +7,6 @@ use nom::combinator::{fail, map, map_opt, map_res, value, verify};
 use nom::error::{FromExternalError, ParseError};
 use nom::multi::fold;
 use nom::sequence::{delimited, preceded};
-use nom::Err;
 use nom::IResult;
 
 use crate::token_span::StrSpan;

@@ -1,5 +1,3 @@
-use std::str::FromStr;
-
 grammar;
 
 pub Programa: () = "program" Id ";" <Var*> Bloque => ();
