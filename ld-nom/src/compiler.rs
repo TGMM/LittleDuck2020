@@ -22,6 +22,7 @@ use inkwell::{
 };
 use std::{error::Error, path::Path};
 
+static MAIN_FN_NAME: &str = "main";
 pub struct Compiler<'input, 'ctx> {
     pub context: &'ctx Context,
     pub builder: &'input Builder<'ctx>,
@@ -253,7 +254,7 @@ impl<'input, 'ctx> Compiler<'input, 'ctx> {
 
     fn build_cond(&self, cond: Condition) {
         let cond_expr = self.build_expr(cond.expression).into_int_value();
-        let fun = self.module.get_function("main").unwrap();
+        let fun = self.module.get_function(MAIN_FN_NAME).unwrap();
 
         // Branch
         let then_bb = self.context.append_basic_block(fun, "then");
@@ -365,7 +366,7 @@ impl<'input, 'ctx> Compiler<'input, 'ctx> {
         let fn_type = self.context.i32_type().fn_type(&[], false);
         let fun = self
             .module
-            .add_function("main", fn_type, Some(Linkage::External));
+            .add_function(MAIN_FN_NAME, fn_type, Some(Linkage::External));
         let entry_basic_block = self.context.append_basic_block(fun, "entry");
         self.builder.position_at_end(entry_basic_block);
 
