@@ -6,6 +6,7 @@ pub mod lexer;
 mod parse_string;
 pub mod parser;
 mod token;
+pub mod token_span;
 
 use clap::Parser;
 use compiler::compile_ld;
