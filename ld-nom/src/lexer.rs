@@ -1,7 +1,10 @@
-use crate::{ast::{Token, VarValue, Id}, parse_string::parse_string};
+use crate::{
+    ast::{Id, Token, VarValue},
+    parse_string::parse_string,
+};
 use nom::{
     branch::alt,
-    bytes::complete::{tag},
+    bytes::complete::tag,
     character::complete::{alpha1, alphanumeric1, digit1, multispace0},
     combinator::{map, opt, recognize},
     error::{Error, ParseError},
@@ -77,7 +80,7 @@ fn number_parser(input: &str) -> IResult<&str, Token> {
     let (remaining, num) = recognize_float(input)?;
     let num_res: Result<_, Err<nom::error::Error<&str>>> =
         pair(opt(alt((tag("+"), tag("-")))), digit1)(num);
-    if let Ok((int_remaining, (sign, num_str))) = num_res 
+    if let Ok((int_remaining, (sign, num_str))) = num_res
     && int_remaining.is_empty()
     && let Ok(mut num) = num_str.parse::<i32>() {
         if sign == Some("-") {
@@ -95,51 +98,62 @@ fn string_parser(input: &str) -> IResult<&str, Token> {
 }
 
 pub fn token_parser(input: &str) -> IResult<&str, Vec<Token>> {
-    many0(ws(alt((keywords_parser, number_parser, string_parser, id_parser))))(input)
+    many0(ws(alt((
+        keywords_parser,
+        number_parser,
+        string_parser,
+        id_parser,
+    ))))(input)
 }
 
 #[cfg(test)]
 mod test {
-    use nom::multi::{many1, many0};
+    use nom::multi::{many0, many1};
 
-    use crate::{ast::{Token, VarValue}, lexer::{ws, number_parser, id_parser}};
-    use super::{token_parser, string_parser, keywords_parser};
+    use super::{keywords_parser, string_parser, token_parser};
+    use crate::{
+        ast::{Token, VarValue},
+        lexer::{id_parser, number_parser, ws},
+    };
 
     #[test]
     fn keywords_parser_test() {
         let input = "program var int float print if else ( ) { } = ; : > < <> , + - / *";
-        
+
         let res = many1(ws(keywords_parser))(input);
         assert!(res.is_ok());
 
         let (remaining, tokens) = res.unwrap();
         dbg!(remaining, &tokens);
         assert!(remaining.is_empty());
-        
-        assert_eq!(tokens, vec![
-            Token::Program,
-            Token::Var,
-            Token::Int,
-            Token::Float,
-            Token::Print,
-            Token::If,
-            Token::Else,
-            Token::LParen,
-            Token::RParen,
-            Token::LBracket,
-            Token::RBracket,
-            Token::Eq,
-            Token::StmtEnd,
-            Token::TypeSep,
-            Token::Gt,
-            Token::Lt,
-            Token::LtGt,
-            Token::Comma,
-            Token::Add,
-            Token::Sub,
-            Token::Div,
-            Token::Mul
-        ]);
+
+        assert_eq!(
+            tokens,
+            vec![
+                Token::Program,
+                Token::Var,
+                Token::Int,
+                Token::Float,
+                Token::Print,
+                Token::If,
+                Token::Else,
+                Token::LParen,
+                Token::RParen,
+                Token::LBracket,
+                Token::RBracket,
+                Token::Eq,
+                Token::StmtEnd,
+                Token::TypeSep,
+                Token::Gt,
+                Token::Lt,
+                Token::LtGt,
+                Token::Comma,
+                Token::Add,
+                Token::Sub,
+                Token::Div,
+                Token::Mul
+            ]
+        );
     }
 
     #[test]
@@ -152,14 +166,17 @@ mod test {
         dbg!(remaining, &tokens);
         assert!(remaining.is_empty());
 
-        assert_eq!(tokens, vec![
-            Token::Num(VarValue::Int(1)),
-            Token::Num(VarValue::Float(2.0)),
-            Token::Num(VarValue::Float(3.1)),
-            Token::Num(VarValue::Float(4.234)),
-            Token::Num(VarValue::Int(5)),
-            Token::Num(VarValue::Int(123456789)),
-        ]);
+        assert_eq!(
+            tokens,
+            vec![
+                Token::Num(VarValue::Int(1)),
+                Token::Num(VarValue::Float(2.0)),
+                Token::Num(VarValue::Float(3.1)),
+                Token::Num(VarValue::Float(4.234)),
+                Token::Num(VarValue::Int(5)),
+                Token::Num(VarValue::Int(123456789)),
+            ]
+        );
     }
 
     #[test]
@@ -173,10 +190,13 @@ mod test {
         dbg!(remaining, &str_tokens);
         assert!(remaining.is_empty());
 
-        assert_eq!(str_tokens, vec![
-            Token::Str("This is a test string\n".to_string()),
-            Token::Str("This is another test string\t".to_string())
-        ]);
+        assert_eq!(
+            str_tokens,
+            vec![
+                Token::Str("This is a test string\n".to_string()),
+                Token::Str("This is another test string\t".to_string())
+            ]
+        );
     }
 
     #[test]
@@ -189,13 +209,16 @@ mod test {
         dbg!(remaining, &tokens);
         assert!(remaining.is_empty());
 
-        assert_eq!(tokens, vec![
-            Token::Id("x".into()),
-            Token::Id("y".into()),
-            Token::Id("z".into()),
-            Token::Id("my_var".into()),
-            Token::Id("my_super_long_var_name".into()),
-        ]);
+        assert_eq!(
+            tokens,
+            vec![
+                Token::Id("x".into()),
+                Token::Id("y".into()),
+                Token::Id("z".into()),
+                Token::Id("my_var".into()),
+                Token::Id("my_super_long_var_name".into()),
+            ]
+        );
     }
 
     #[test]
@@ -215,18 +238,21 @@ mod test {
         dbg!(remaining);
         assert!(remaining.is_empty());
 
-        assert_eq!(token_vec, vec![
-            Token::Program,
-            Token::Id("my_program".into()),
-            Token::StmtEnd,
-            Token::LBracket,
-            Token::Print,
-            Token::LParen,
-            Token::Str("\ntest".to_string()),
-            Token::RParen,
-            Token::StmtEnd,
-            Token::RBracket,
-        ]);
+        assert_eq!(
+            token_vec,
+            vec![
+                Token::Program,
+                Token::Id("my_program".into()),
+                Token::StmtEnd,
+                Token::LBracket,
+                Token::Print,
+                Token::LParen,
+                Token::Str("\ntest".to_string()),
+                Token::RParen,
+                Token::StmtEnd,
+                Token::RBracket,
+            ]
+        );
     }
 
     #[test]
@@ -252,5 +278,109 @@ mod test {
         let res = token_parser(input);
         dbg!(&res);
         assert!(res.is_ok());
+
+        let (remaining, token_vec) = res.unwrap();
+        dbg!(remaining);
+        assert!(remaining.is_empty());
+
+        assert_eq!(token_vec, {
+            use Token::*;
+            vec![
+                // program my_program;
+                Program,
+                Id("my_program".into()),
+                StmtEnd,
+                // var my_var: int;
+                Var,
+                Id("my_var".into()),
+                TypeSep,
+                Int,
+                StmtEnd,
+                // var my_other_var, my_other_other_var: float;
+                Var,
+                Id("my_other_var".into()),
+                Comma,
+                Id("my_other_other_var".into()),
+                TypeSep,
+                Float,
+                StmtEnd,
+                // {
+                LBracket,
+                // my_var = 10.0;
+                Id("my_var".into()),
+                Eq,
+                Num(VarValue::Float(10.0)),
+                StmtEnd,
+                // my_var = 10 > 10;
+                Id("my_var".into()),
+                Eq,
+                Num(VarValue::Int(10)),
+                Gt,
+                Num(VarValue::Int(10)),
+                StmtEnd,
+                // my_var = 10 < 10;
+                Id("my_var".into()),
+                Eq,
+                Num(VarValue::Int(10)),
+                Lt,
+                Num(VarValue::Int(10)),
+                StmtEnd,
+                // my_var = 10 <> 10;
+                Id("my_var".into()),
+                Eq,
+                Num(VarValue::Int(10)),
+                LtGt,
+                Num(VarValue::Int(10)),
+                StmtEnd,
+                // my_var = 10 + 5 * 30;
+                Id("my_var".into()),
+                Eq,
+                Num(VarValue::Int(10)),
+                Add,
+                Num(VarValue::Int(5)),
+                Mul,
+                Num(VarValue::Int(30)),
+                StmtEnd,
+                // my_var = (10 + 5) * 30;
+                Id("my_var".into()),
+                Eq,
+                LParen,
+                Num(VarValue::Int(10)),
+                Add,
+                Num(VarValue::Int(5)),
+                RParen,
+                Mul,
+                Num(VarValue::Int(30)),
+                StmtEnd,
+                // my_var = 10 + (5 * 30);
+                Id("my_var".into()),
+                Eq,
+                Num(VarValue::Int(10)),
+                Add,
+                LParen,
+                Num(VarValue::Int(5)),
+                Mul,
+                Num(VarValue::Int(30)),
+                RParen,
+                StmtEnd,
+                // print("test");
+                Print,
+                LParen,
+                Str("test".to_string()),
+                RParen,
+                StmtEnd,
+                // print("test", my_var, 10);
+                Print,
+                LParen,
+                Str("test".to_string()),
+                Comma,
+                Id("my_var".into()),
+                Comma,
+                Num(VarValue::Int(10)),
+                RParen,
+                StmtEnd,
+                RBracket,
+            ]
+        });
     }
 }
