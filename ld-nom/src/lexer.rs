@@ -1,14 +1,19 @@
+use std::{
+    collections::{HashMap, HashSet},
+    sync::LazyLock,
+};
+
 use crate::{
-    ast::{Id, Token, VarValue},
+    ast::{Token, VarValue},
     parse_string::parse_string,
     token_span::{StrSpan, TokenSpan},
 };
 use nom::{
     branch::alt,
     bytes::complete::tag,
-    character::complete::{alpha1, alphanumeric1, digit1, multispace0},
+    character::complete::{alpha1, alphanumeric1, digit1, multispace0, one_of},
     combinator::{map, opt, recognize},
-    error::{Error, ParseError},
+    error::{Error, ErrorKind, ParseError},
     multi::many0,
     number::complete::{float, recognize_float},
     sequence::{delimited, pair},
@@ -24,65 +29,87 @@ where
     delimited(multispace0, inner, multispace0)
 }
 
-#[inline]
-fn keyword_parser<'s>(
-    keyword: &'s str,
-    tok: Token,
-) -> impl FnMut(StrSpan<'s>) -> Result<(StrSpan<'s>, TokenSpan), Err<Error<StrSpan<'s>>>> {
-    map(tag(keyword), move |span| TokenSpan {
-        position: span,
-        token: tok.clone(),
-    })
-}
-
-fn keywords_parser(input: StrSpan) -> IResult<StrSpan, TokenSpan> {
+static KEYWORD_DICT: LazyLock<HashMap<&'static str, Token>> = LazyLock::new(|| {
+    let mut hm = HashMap::new();
     // Keywords
-    let program = keyword_parser("program", Token::Program);
-    let var = keyword_parser("var", Token::Var);
-    let int = keyword_parser("int", Token::Int);
-    let float = keyword_parser("float", Token::Float);
-    let print = keyword_parser("print", Token::Print);
-    let kw_if = keyword_parser("if", Token::If);
-    let kw_else = keyword_parser("else", Token::Else);
+    hm.insert("program", Token::Program);
+    hm.insert("var", Token::Var);
+    hm.insert("int", Token::Int);
+    hm.insert("float", Token::Float);
+    hm.insert("print", Token::Print);
+    hm.insert("if", Token::If);
+    hm.insert("else", Token::Else);
+    hm
+});
 
-    let kw = alt((program, var, int, float, print, kw_if, kw_else));
-
+static OPERATOR_DICT: LazyLock<HashMap<&'static str, Token>> = LazyLock::new(|| {
+    let mut hm = HashMap::new();
     // Operators
-    let lparen = keyword_parser("(", Token::LParen);
-    let rparen = keyword_parser(")", Token::RParen);
-    let lbracket = keyword_parser("{", Token::LBracket);
-    let rbracket = keyword_parser("}", Token::RBracket);
-    let equal = keyword_parser("=", Token::Eq);
-    let stmt_end = keyword_parser(";", Token::StmtEnd);
-    let type_sep = keyword_parser(":", Token::TypeSep);
-    let gt = keyword_parser(">", Token::Gt);
-    let lt = keyword_parser("<", Token::Lt);
-    let lt_gt = keyword_parser("<>", Token::LtGt);
-    let comma = keyword_parser(",", Token::Comma);
-    let add = keyword_parser("+", Token::Add);
-    let sub = keyword_parser("-", Token::Sub);
-    let div = keyword_parser("/", Token::Div);
-    let mul = keyword_parser("*", Token::Mul);
+    hm.insert("(", Token::LParen);
+    hm.insert(")", Token::RParen);
+    hm.insert("{", Token::LBracket);
+    hm.insert("}", Token::RBracket);
+    hm.insert("=", Token::Eq);
+    hm.insert(";", Token::StmtEnd);
+    hm.insert(":", Token::TypeSep);
+    hm.insert(">", Token::Gt);
+    hm.insert("<", Token::Lt);
+    hm.insert("<>", Token::LtGt);
+    hm.insert(",", Token::Comma);
+    hm.insert("+", Token::Add);
+    hm.insert("-", Token::Sub);
+    hm.insert("/", Token::Div);
+    hm.insert("*", Token::Mul);
+    hm
+});
 
-    let op = alt((
-        lparen, rparen, lbracket, rbracket, equal, stmt_end, type_sep, lt_gt, gt, lt, comma, add,
-        sub, div, mul,
-    ));
+static OPERATOR_CHARS: LazyLock<String> = LazyLock::new(|| {
+    let mut hs: HashSet<char> = HashSet::new();
+    for op in OPERATOR_DICT.keys() {
+        hs.extend(op.chars());
+    }
 
-    alt((kw, op))(input)
+    hs.into_iter().collect()
+});
+
+/// Parser identifiers and keywords
+fn id_kw_parser(input: StrSpan) -> IResult<StrSpan, TokenSpan> {
+    let (remaining, id) = recognize(pair(
+        alt((alpha1, tag("_"))),
+        many0(alt((alphanumeric1, tag("_")))),
+    ))(input)?;
+
+    let id_str: &str = &id;
+    let id_tok = KEYWORD_DICT
+        .get(id_str)
+        .map(|token| token.clone())
+        .unwrap_or(Token::Id(id_str.into()));
+
+    Ok((
+        remaining,
+        TokenSpan {
+            position: id,
+            token: id_tok,
+        },
+    ))
 }
 
-fn id_parser(input: StrSpan) -> IResult<StrSpan, TokenSpan> {
-    map(
-        recognize(pair(
-            alt((alpha1, tag("_"))),
-            many0(alt((alphanumeric1, tag("_")))),
-        )),
-        |s: StrSpan| TokenSpan {
-            position: s,
-            token: Token::Id(Id(s.to_string())),
+fn operator_parser(input: StrSpan) -> IResult<StrSpan, TokenSpan> {
+    // This will break in case another double (or more) digit operator is added
+    let (remaining, op_span) =
+        recognize(pair(one_of(OPERATOR_CHARS.as_str()), opt(tag(">"))))(input)?;
+    let op_str: &str = &op_span;
+    let op = OPERATOR_DICT
+        .get(op_str)
+        .ok_or_else(|| Err::Error(Error::from_error_kind(remaining, ErrorKind::OneOf)))?;
+
+    Ok((
+        remaining,
+        TokenSpan {
+            position: op_span,
+            token: op.clone(),
         },
-    )(input)
+    ))
 }
 
 fn number_parser(input: StrSpan) -> IResult<StrSpan, TokenSpan> {
@@ -127,10 +154,10 @@ pub fn token_parser(input: &str) -> IResult<StrSpan, Vec<TokenSpan>> {
     let input = StrSpan::new(input);
 
     many0(ws(alt((
-        keywords_parser,
         number_parser,
         string_parser,
-        id_parser,
+        id_kw_parser,
+        operator_parser,
     ))))(input)
 }
 
@@ -138,18 +165,18 @@ pub fn token_parser(input: &str) -> IResult<StrSpan, Vec<TokenSpan>> {
 mod test {
     use nom::multi::{many0, many1};
 
-    use super::{keywords_parser, string_parser, token_parser};
+    use super::{string_parser, token_parser};
     use crate::{
         ast::{Token, VarValue},
-        lexer::{id_parser, number_parser, ws, StrSpan},
+        lexer::{id_kw_parser, number_parser, operator_parser, ws, StrSpan},
     };
 
     #[test]
     fn keywords_parser_test() {
-        let input_str = "program var int float print if else ( ) { } = ; : > < <> , + - / *";
+        let input_str = "program var int float print if else";
         let input = StrSpan::new(input_str);
 
-        let res = many1(ws(keywords_parser))(input);
+        let res = many1(ws(id_kw_parser))(input);
         assert!(res.is_ok());
 
         let (remaining, token_spans) = res.unwrap();
@@ -167,6 +194,26 @@ mod test {
                 Token::Print,
                 Token::If,
                 Token::Else,
+            ]
+        );
+    }
+
+    #[test]
+    fn operator_parser_test() {
+        let input_str = "( ) { } = ; : > < <> , + - / *";
+        let input = StrSpan::new(input_str);
+
+        let res = many1(ws(operator_parser))(input);
+        assert!(res.is_ok());
+
+        let (remaining, token_spans) = res.unwrap();
+        dbg!(remaining, &token_spans);
+        assert!(remaining.is_empty());
+
+        let tokens: Vec<Token> = token_spans.into_iter().map(|ts| ts.into()).collect();
+        assert_eq!(
+            tokens,
+            vec![
                 Token::LParen,
                 Token::RParen,
                 Token::LBracket,
@@ -237,7 +284,7 @@ mod test {
     fn id_parser_test() {
         let input_str = "x y z my_var my_super_long_var_name";
         let input = StrSpan::new(input_str);
-        let res = many1(ws(id_parser))(input);
+        let res = many1(ws(id_kw_parser))(input);
         assert!(res.is_ok());
 
         let (remaining, token_spans) = res.unwrap();

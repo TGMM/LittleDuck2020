@@ -1,4 +1,5 @@
 #![feature(let_chains)]
+#![feature(once_cell)]
 
 mod ast;
 mod compiler;
