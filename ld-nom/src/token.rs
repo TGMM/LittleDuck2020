@@ -62,8 +62,8 @@ impl<'a> Input for Tokens<'a> {
 
     // InputIter
     type Item = &'a Token;
-    type Iter = ::std::slice::Iter<'a, Token>;
-    type IterIndices = Enumerate<::std::slice::Iter<'a, Token>>;
+    type Iter = std::slice::Iter<'a, Token>;
+    type IterIndices = Enumerate<Self::Iter>;
 
     #[inline]
     fn iter_indices(&self) -> Self::IterIndices {
