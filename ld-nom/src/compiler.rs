@@ -447,20 +447,19 @@ impl<'input, 'ctx> Compiler<'input, 'ctx> {
         out_path
     }
 
-    fn link_windows(obj_path: &str) {
-        println!("Linking {obj_path}");
-        let out = format!("-out:{}.exe", obj_path);
+    fn link_windows(out_path: &str, output_name: &str) {
+        println!("Linking {output_name}.exe...");
+        let out = format!("-out:{}.exe", out_path);
         let default_lib = "-defaultlib:libcmt".to_string();
         // TODO: Dynamically find these
-        let lp1 = "-libpath:\"C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.32.31326\\lib\\x64\"".to_string();
+        let lp1 = "-libpath:C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.32.31326\\lib\\x64".to_string();
         let lp2 =
-            "-libpath:\"C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.19041.0\\ucrt\\x64\""
+            "-libpath:C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.19041.0\\ucrt\\x64"
                 .to_string();
-        let lp3 =
-            "-libpath:\"C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.19041.0\\um\\x64\""
-                .to_string();
+        let lp3 = "-libpath:C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.19041.0\\um\\x64"
+            .to_string();
         let no_logo = "-nologo".to_string();
-        let obj_file = format!("{}.o", obj_path);
+        let obj_file = format!("{}.o", out_path);
         let lld_result = link(
             LldFlavor::Coff,
             &[out, default_lib, lp1, lp2, lp3, no_logo, obj_file],
@@ -514,7 +513,7 @@ pub fn compile_ld(input: &str, output_dir: &str, output_name: &str) -> Result<()
 
     compiler.codegen(program);
     let obj_path = Compiler::compile_to_x86(&compiler, output_dir, output_name);
-    Compiler::link_windows(obj_path.as_str());
+    Compiler::link_windows(obj_path.as_str(), output_name);
 
     Ok(())
 }
