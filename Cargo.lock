@@ -343,6 +343,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "inkwell",
+ "lld_rs",
  "nom",
  "nom_locate",
 ]
@@ -358,6 +359,19 @@ name = "linux-raw-sys"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f051f77a7c8e6957c0696eac88f26b0117e54f52d3fc682ab19397a8812846a4"
+
+[[package]]
+name = "lld_rs"
+version = "140.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "baaf6b2e9692ad79c55f5c61beba6340eda0771bfe699a73f29216d88853bf8f"
+dependencies = [
+ "cc",
+ "lazy_static",
+ "libc",
+ "llvm-sys",
+ "semver",
+]
 
 [[package]]
 name = "llvm-sys"

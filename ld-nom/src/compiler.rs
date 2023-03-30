@@ -20,7 +20,8 @@ use inkwell::{
     },
     AddressSpace, FloatPredicate, IntPredicate, OptimizationLevel,
 };
-use std::{error::Error, path::Path};
+use lld_rs::{link, LldFlavor};
+use std::{error::Error, fmt::format, path::Path};
 
 static MAIN_FN_NAME: &str = "main";
 pub struct Compiler<'input, 'ctx> {
@@ -401,7 +402,7 @@ impl<'input, 'ctx> Compiler<'input, 'ctx> {
         self.builder.build_return(Some(&int_zero));
     }
 
-    fn compile_to_x86(compiler: &Compiler<'input, 'ctx>, path: &str, file_name: &str) {
+    fn compile_to_x86(compiler: &Compiler<'input, 'ctx>, path: &str, file_name: &str) -> String {
         Target::initialize_x86(&InitializationConfig::default());
         let triple = TargetTriple::create("x86_64-pc-windows-msvc");
         let target = Target::from_triple(&triple).unwrap();
@@ -423,24 +424,52 @@ impl<'input, 'ctx> Compiler<'input, 'ctx> {
             .module
             .set_data_layout(&target_machine.get_target_data().get_data_layout());
 
+        let out_path = format!("{path}\\{file_name}");
         compiler
             .module
-            .print_to_file(&format!("{path}/{file_name}.ll"))
+            .print_to_file(&format!("{out_path}.ll"))
             .unwrap();
         target_machine
             .write_to_file(
                 compiler.module,
                 FileType::Object,
-                Path::new(&format!("{path}/{file_name}.o")),
+                Path::new(&format!("{out_path}.o")),
             )
             .unwrap();
         target_machine
             .write_to_file(
                 compiler.module,
                 FileType::Assembly,
-                Path::new(&format!("{path}/{file_name}.asm")),
+                Path::new(&format!("{out_path}.asm")),
             )
             .unwrap();
+
+        out_path
+    }
+
+    fn link_windows(obj_path: &str) {
+        println!("Linking {obj_path}");
+        let out = format!("-out:{}.exe", obj_path);
+        let default_lib = "-defaultlib:libcmt".to_string();
+        // TODO: Dynamically find these
+        let lp1 = "-libpath:\"C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.32.31326\\lib\\x64\"".to_string();
+        let lp2 =
+            "-libpath:\"C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.19041.0\\ucrt\\x64\""
+                .to_string();
+        let lp3 =
+            "-libpath:\"C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.19041.0\\um\\x64\""
+                .to_string();
+        let no_logo = "-nologo".to_string();
+        let obj_file = format!("{}.o", obj_path);
+        let lld_result = link(
+            LldFlavor::Coff,
+            &[out, default_lib, lp1, lp2, lp3, no_logo, obj_file],
+        );
+
+        match lld_result.ok() {
+            Ok(_) => {}
+            Err(err) => println!("{err}"),
+        }
     }
 }
 
@@ -484,7 +513,8 @@ pub fn compile_ld(input: &str, output_dir: &str, output_name: &str) -> Result<()
         .add_function("printf", printf_signature, Some(Linkage::External));
 
     compiler.codegen(program);
-    Compiler::compile_to_x86(&compiler, output_dir, output_name);
+    let obj_path = Compiler::compile_to_x86(&compiler, output_dir, output_name);
+    Compiler::link_windows(obj_path.as_str());
 
     Ok(())
 }
