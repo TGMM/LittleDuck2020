@@ -21,7 +21,11 @@ use inkwell::{
     AddressSpace, FloatPredicate, IntPredicate, OptimizationLevel,
 };
 use lld_rs::{link, LldFlavor};
-use std::{error::Error, fmt::format, path::Path};
+use std::{
+    error::Error,
+    fs,
+    path::{Path, PathBuf},
+};
 
 static MAIN_FN_NAME: &str = "main";
 pub struct Compiler<'input, 'ctx> {
@@ -413,7 +417,7 @@ impl<'input, 'ctx> Compiler<'input, 'ctx> {
                 &triple,
                 cpu,
                 features,
-                OptimizationLevel::None,
+                OptimizationLevel::Aggressive,
                 RelocMode::Default,
                 CodeModel::Default,
             )
@@ -448,16 +452,51 @@ impl<'input, 'ctx> Compiler<'input, 'ctx> {
     }
 
     fn link_windows(out_path: &str, output_name: &str) {
+        use cc::windows_registry;
+
         println!("Linking {output_name}.exe...");
         let out = format!("-out:{}.exe", out_path);
         let default_lib = "-defaultlib:libcmt".to_string();
+
+        let host_triple = current_platform::COMPILED_ON;
+        let bits = if host_triple.contains("64") {
+            "x64"
+        } else {
+            "x86"
+        };
+
+        let (sdk_dir, version) = windows_registry::impl_::get_ucrt_dir().unwrap();
+        let lib_dir = sdk_dir.join("Lib").join(version);
+        let ucrt_dir = lib_dir.join("ucrt").join(bits);
+        let um_dir = lib_dir.join("um").join(bits);
+
+        let mut vs_instances: Vec<PathBuf> =
+            match windows_registry::impl_::vs15plus_instances(host_triple) {
+                Some(instances) => instances
+                    .into_iter()
+                    .filter_map(|instance| instance.installation_path())
+                    .collect(),
+                None => Vec::new(),
+            };
+        vs_instances.sort();
+        let vs_instance = vs_instances
+            .first()
+            .expect("No visual studio or build tools installation found, exiting...");
+        let msvc_folder_path = vs_instance.join("VC").join("Tools").join("MSVC");
+        let msvc_folder = fs::read_dir(msvc_folder_path).unwrap();
+
+        let newest_msvc = msvc_folder
+            .into_iter()
+            .map(|d| d.unwrap())
+            .map(|d| d.path())
+            .max()
+            .unwrap();
+        let msvc_lib = newest_msvc.join("lib").join(bits);
+
         // TODO: Dynamically find these
-        let lp1 = "-libpath:C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Tools\\MSVC\\14.32.31326\\lib\\x64".to_string();
-        let lp2 =
-            "-libpath:C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.19041.0\\ucrt\\x64"
-                .to_string();
-        let lp3 = "-libpath:C:\\Program Files (x86)\\Windows Kits\\10\\Lib\\10.0.19041.0\\um\\x64"
-            .to_string();
+        let lp1 = format!("-libpath:{}", msvc_lib.to_str().unwrap());
+        let lp2 = format!("-libpath:{}", ucrt_dir.to_str().unwrap());
+        let lp3 = format!("-libpath:{}", um_dir.to_str().unwrap());
         let no_logo = "-nologo".to_string();
         let obj_file = format!("{}.o", out_path);
         let lld_result = link(

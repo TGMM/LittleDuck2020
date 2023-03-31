@@ -1,5 +1,5 @@
 #![feature(let_chains)]
-#![feature(once_cell)]
+#![feature(lazy_cell)]
 
 mod ast;
 mod compiler;
@@ -20,7 +20,29 @@ struct Args {
     paths: Vec<String>,
 }
 
+#[cfg(windows)]
+pub(crate) fn do_msvc_check() -> bool {
+    use cc::windows_registry;
+
+    // TODO: The x64 compiler should also be able to compile x86
+    let host_triple = current_platform::COMPILED_ON;
+    if !host_triple.contains("msvc") {
+        return true;
+    }
+
+    windows_registry::find_tool(&host_triple, "cl.exe").is_some()
+}
+
 fn main() {
+    #[cfg(windows)]
+    if !do_msvc_check() {
+        eprintln!(
+            "The Microsoft C++ build tools for Visual Studio 2013 or
+        later are required, but they don't seem to be installed."
+        );
+        exit(-1);
+    }
+
     let args = Args::parse();
 
     if args.paths.is_empty() {
