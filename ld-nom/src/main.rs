@@ -11,7 +11,7 @@ pub mod token_span;
 
 use clap::Parser;
 use compiler::compile_ld;
-use std::{fs, path::Path, process::exit};
+use std::{env, fs, path::Path, process::exit};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -58,9 +58,18 @@ fn main() {
             exit(-1);
         }
 
-        let dir = path.parent().unwrap().to_str().unwrap();
-        let file_name = path.file_name().unwrap().to_str().unwrap();
-        let output_name = path.file_stem().unwrap().to_str().unwrap();
+        let current_dir = env::current_dir().unwrap();
+        let dir = current_dir.to_str().expect("Couldn't find parent");
+        let file_name = path
+            .file_name()
+            .unwrap()
+            .to_str()
+            .expect("Invalid file name");
+        let output_name = path
+            .file_stem()
+            .unwrap()
+            .to_str()
+            .expect("Invalid output name");
         println!("Compiling {}...", file_name);
         let file_content = fs::read_to_string(path).expect("Unable to read file");
         compile_ld(&file_content, dir, output_name).unwrap();
