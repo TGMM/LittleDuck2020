@@ -8,3 +8,6 @@ nom = { git = "https://github.com/rust-bakery/nom" }
 nom_locate = { git = "https://github.com/TGMM/nom_locate" }
 inkwell = { git = "https://github.com/TheDan64/inkwell", branch = "master", features = ["llvm14-0", "target-x86"], default-features = false }
 clap = { version = "4.1.13", features = ["derive"] }
+lld_rs = "140.0.0"
+cc = { git = "https://github.com/TGMM/cc-rs" }
+current_platform = "0.2.0"
